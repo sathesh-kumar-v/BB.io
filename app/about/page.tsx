@@ -90,13 +90,23 @@ export default function AboutPage() {
     },
   ]
 
-  const coreTeam = [
+  type CoreTeamMember = {
+    name: string
+    title: string
+    specialization: string
+    expertise: string
+    projects: string
+    image?: string
+  }
+
+  const coreTeam: CoreTeamMember[] = [
     {
       name: "Mathavan",
       title: "AI Developer",
       specialization: "Machine Learning & AI Integration Expert",
       expertise: "GPT-4 integration, custom ML models, intelligent automation systems",
       projects: "Lead developer on Octupus.ai and Wellenpuls AI coaching systems",
+      image: "/Mathavan_Stroke.png",
     },
     {
       name: "Logu",
@@ -132,6 +142,7 @@ export default function AboutPage() {
       specialization: "Full-Stack Application Architecture",
       expertise: "Modern web development, database optimization, system integration",
       projects: "Complex business system integrations and custom applications",
+      image: "/Sathish_Stroke.png",
     },
     {
       name: "Azeez",
@@ -139,6 +150,7 @@ export default function AboutPage() {
       specialization: "User Experience & Interface Design",
       expertise: "Mobile app design, web interfaces, user journey optimization",
       projects: "Wellenpuls app design and client interface development",
+      image: "/Azeez_Stroke.png",
     },
     {
       name: "Priya",
@@ -350,7 +362,10 @@ export default function AboutPage() {
                 >
                   <div className="aspect-square rounded-xl overflow-hidden mb-4 bg-gradient-to-br from-primary/10 to-primary/5">
                     <img
-                      src={`/professional-developer-headshot-.jpg?height=300&width=300&query=professional developer headshot ${member.name}`}
+                      src={
+                        member.image ??
+                        `/professional-developer-headshot-.jpg?height=300&width=300&query=professional developer headshot ${member.name}`
+                      }
                       alt={member.name}
                       className="w-full h-full object-cover"
                     />
