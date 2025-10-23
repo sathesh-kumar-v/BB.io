@@ -1,4 +1,59 @@
 {
   "consultations": [],
-  "footerLeads": []
+  "footerLeads": [
+    {
+      "name": "Sathesh",
+      "email": "sathes.brandingbeez@gmail.com",
+      "companyName": "BB",
+      "industry": "manufacturing",
+      "preferredCallTime": "2-3PM",
+      "id": "7b3a1b5c-c1db-4007-bedc-f1a3f116940f",
+      "createdAt": "2025-10-23T10:59:20.952Z"
+    },
+    {
+      "name": "Sathesh",
+      "email": "sathes.brandingbeez@gmail.com",
+      "companyName": "BB",
+      "industry": "manufacturing",
+      "preferredCallTime": "2-3PM",
+      "id": "318023de-fd3c-4a4b-8805-1e0072ab7bdd",
+      "createdAt": "2025-10-23T11:01:04.681Z"
+    },
+    {
+      "name": "Sathesh",
+      "email": "skumar.v.a1999@gmail.com",
+      "companyName": "BB",
+      "industry": "manufacturing",
+      "preferredCallTime": "2-3PM",
+      "id": "902ddff7-98af-4503-b086-dc8982eaf769",
+      "createdAt": "2025-10-23T11:02:08.462Z"
+    },
+    {
+      "name": "Sathesh",
+      "email": "skumar.v.a1999@gmail.com",
+      "companyName": "BB",
+      "industry": "manufacturing",
+      "preferredCallTime": "2-3PM",
+      "id": "9bb653f4-c393-40b4-88b5-3e97060addd5",
+      "createdAt": "2025-10-23T11:06:13.617Z"
+    },
+    {
+      "name": "Sathesh",
+      "email": "skumar.v.a1999@gmail.com",
+      "companyName": "BB",
+      "industry": "manufacturing",
+      "preferredCallTime": "2-3PM",
+      "id": "8135eee4-2a08-4ab9-9d50-00ac79238b8c",
+      "createdAt": "2025-10-23T11:27:15.053Z"
+    },
+    {
+      "name": "Sathesh",
+      "email": "skumar.v.a1999@gmail.com",
+      "companyName": "BB",
+      "industry": "manufacturing",
+      "preferredCallTime": "2-3PM",
+      "id": "88dbefb8-2a75-4909-8cec-597d2bdee08b",
+      "createdAt": "2025-10-23T11:37:26.268Z"
+    }
+  ]
 }

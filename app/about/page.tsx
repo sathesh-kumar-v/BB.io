@@ -45,7 +45,17 @@ export default function AboutPage() {
     },
   ]
 
-  const leadership = [
+  type LeadershipMember = {
+    name: string;
+    title: string;
+    background: string;
+    focus: string[];
+    philosophy: string;
+    image?: string;
+  };
+
+
+  const leadership: LeadershipMember[] = [
     {
       name: "Vignesh",
       title: "Founder & Visionary",
@@ -59,6 +69,7 @@ export default function AboutPage() {
       ],
       philosophy:
         "AI should solve business problems, not create technology problems. Every solution we build starts with understanding the real challenge, not showcasing our technical capabilities.",
+      image: "/Vignesh.png",
     },
     {
       name: "Raje",
@@ -71,6 +82,7 @@ export default function AboutPage() {
         "Team leadership and development",
         "Business growth and expansion",
       ],
+      image: "/Raje.png",
       philosophy:
         "Results speak louder than promises. We measure our success by our clients' success, and every project must deliver clear ROI.",
     },
@@ -85,10 +97,11 @@ export default function AboutPage() {
         "Future-proofing client solutions",
         "Industry trend analysis and application",
       ],
+      image: "/Charan.png",
       philosophy:
         "We don't just implement today's AI - we build foundations that adapt and grow with tomorrow's innovations.",
     },
-  ]
+  ];
 
   type CoreTeamMember = {
     name: string
@@ -114,6 +127,7 @@ export default function AboutPage() {
       specialization: "End-to-End Application Development",
       expertise: "React, Node.js, database design, API integration",
       projects: "AC Graphics CRM architecture and mobile app development",
+      image: "/Logu.png",
     },
     {
       name: "Vishnu",
@@ -121,6 +135,7 @@ export default function AboutPage() {
       specialization: "WordPress & CMS Integration Expert",
       expertise: "Custom WordPress development, plugin creation, CMS optimization",
       projects: "WordPress AI integration and content management solutions",
+      image: "/Vishnu.png",
     },
     {
       name: "Yuva",
@@ -128,6 +143,7 @@ export default function AboutPage() {
       specialization: "Digital Visibility & Search Optimization",
       expertise: "Technical SEO, content optimization, AI-powered SEO strategies",
       projects: "Client digital presence optimization and search performance",
+      image: "/Yuva.png",
     },
     {
       name: "Gopal",
@@ -135,6 +151,7 @@ export default function AboutPage() {
       specialization: "Digital Marketing & Advertising Strategy",
       expertise: "Paid advertising, conversion optimization, marketing automation",
       projects: "Client acquisition campaigns and ROI optimization",
+      image: "/Gopal.png",
     },
     {
       name: "Sathesh",
@@ -150,7 +167,7 @@ export default function AboutPage() {
       specialization: "User Experience & Interface Design",
       expertise: "Mobile app design, web interfaces, user journey optimization",
       projects: "Wellenpuls app design and client interface development",
-      image: "/Azeez_Stroke.png",
+      image: "/Azeez.png",
     },
     {
       name: "Priya",
@@ -158,6 +175,7 @@ export default function AboutPage() {
       specialization: "Business Process Automation",
       expertise: "Workflow optimization, process automation, system integration",
       projects: "Client process analysis and automation implementation",
+      image: "/Priya.png",
     },
     {
       name: "Athira",
@@ -165,20 +183,22 @@ export default function AboutPage() {
       specialization: "Team Development & Client Relations",
       expertise: "Team coordination, client communication, project management",
       projects: "Team optimization and client success management",
+      image: "/Athira.png",
     },
-    {
-      name: "Satheesh",
-      title: "Full-Stack Developer",
-      specialization: "Advanced Web Development",
-      expertise: "Complex system development, API design, performance optimization",
-      projects: "Enterprise-level integrations and scalable solutions",
-    },
+    // {
+    //   name: "Satheesh",
+    //   title: "Full-Stack Developer",
+    //   specialization: "Advanced Web Development",
+    //   expertise: "Complex system development, API design, performance optimization",
+    //   projects: "Enterprise-level integrations and scalable solutions",
+    // },
     {
       name: "Niju",
       title: "WordPress Developer",
       specialization: "WordPress Solutions & Integration",
       expertise: "Custom WordPress development, plugin architecture, CMS optimization",
       projects: "WordPress-based business solutions and integrations",
+      image: "/Niju.png",
     },
   ]
 
@@ -325,7 +345,11 @@ export default function AboutPage() {
               <div key={index} className="bg-card border border-border rounded-xl p-6">
                 <div className="aspect-square rounded-xl overflow-hidden mb-4 bg-gradient-to-br from-primary/20 to-primary/5">
                   <img
-                    src={`/executive-headshot.png?height=400&width=400&query=professional executive headshot ${leader.name}`}
+                    src={
+                      leader.image
+                        ? leader.image
+                        : `/executive-headshot.png?height=400&width=400&query=professional executive headshot ${leader.name}`
+                    }
                     alt={leader.name}
                     className="w-full h-full object-cover"
                   />
