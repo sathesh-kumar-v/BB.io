@@ -2,13 +2,15 @@ import Link from "next/link"
 import { Github, Linkedin, Twitter } from "lucide-react"
 import Image from "next/image"
 
+import { FooterLeadForm } from "@/components/forms/footer-lead-form"
+
 export function Footer() {
   return (
     <footer className="bg-[#111111] border-t border-[#262626]">
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-5">
           {/* Brand */}
-          <div className="col-span-1 md:col-span-2">
+          <div className="col-span-1 lg:col-span-2">
             <div className="mb-6 flex items-center gap-4">
               <Image src="/logo-icon.png" alt="BrandingBeez.io" width={48} height={48} className="h-12 w-12" />
               <span className="text-2xl font-bold text-white">BrandingBeez.io</span>
@@ -77,6 +79,14 @@ export function Footer() {
                 </Link>
               </li>
             </ul>
+          </div>
+          {/* Quick Contact */}
+          <div className="col-span-1 lg:col-span-2">
+            <h3 className="text-white font-semibold mb-4">Request a quick call</h3>
+            <p className="mb-4 text-sm text-[#a1a1aa]">
+              Share a few details and we&apos;ll reach out with a tailored next step for your AI transformation.
+            </p>
+            <FooterLeadForm />
           </div>
         </div>
 
