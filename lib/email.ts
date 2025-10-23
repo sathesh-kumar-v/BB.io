@@ -1,4 +1,6 @@
+import net from "node:net"
 import tls from "node:tls"
+import { once } from "node:events"
 
 const EMAIL_TEMPLATES = {
   consultation: {
@@ -80,51 +82,100 @@ async function sendEmailThroughSmtp(options: SmtpSendOptions) {
 
   const message = buildMimeMessage({ from, to, subject, html })
   const envelopeFrom = extractEmailAddress(from)
+  const connectionStrategy = resolveConnectionStrategy(port)
 
-  await new Promise<void>((resolve, reject) => {
-    const socket = tls.connect(
-      {
-        host,
-        port,
-        servername: host,
-      },
-      () => {
-        socket.setEncoding("utf8")
+  let socket: net.Socket | tls.TLSSocket | undefined
+  let client: SmtpClient | null = null
 
-        const client = createSmtpClient(socket)
+  try {
+    socket = await openSmtpSocket({ host, port, strategy: connectionStrategy })
+    configureSocket(socket)
 
-        ;(async () => {
-          try {
-            await expectCode(await client.readResponse(), 220)
-            await expectCode(await client.sendCommand(`EHLO brandingbeez.io`), 250)
-            await expectCode(await client.sendCommand("AUTH LOGIN"), 334)
-            await expectCode(await client.sendCommand(Buffer.from(user).toString("base64")), 334)
-            await expectCode(await client.sendCommand(Buffer.from(password).toString("base64")), 235)
-            await expectCode(await client.sendCommand(`MAIL FROM:<${envelopeFrom}>`), 250)
-            await expectCode(await client.sendCommand(`RCPT TO:<${to}>`), 250)
-            await expectCode(await client.sendCommand("DATA"), 354)
+    client = createSmtpClient(socket)
 
-            client.write(`${message}\r\n.\r\n`)
-            await expectCode(await client.readResponse(), 250)
+    await expectCode(await client.readResponse(), 220)
+    await expectCode(await client.sendCommand(`EHLO brandingbeez.io`), 250)
 
-            client.write("QUIT\r\n")
-            resolve()
-          } catch (error) {
-            reject(error)
-          } finally {
-            socket.end()
-          }
-        })().catch(reject)
-      },
-    )
+    if (connectionStrategy === "starttls") {
+      await expectCode(await client.sendCommand("STARTTLS"), 220)
 
-    socket.setTimeout(15000, () => {
-      socket.destroy(new Error("SMTP connection timed out"))
-    })
+      client.dispose()
+      socket.setTimeout(0)
 
-    socket.on("error", (error) => {
-      reject(error)
-    })
+      socket = await upgradeToTls(socket as net.Socket, host)
+      configureSocket(socket)
+
+      client = createSmtpClient(socket)
+      await expectCode(await client.sendCommand(`EHLO brandingbeez.io`), 250)
+    }
+
+    await expectCode(await client.sendCommand("AUTH LOGIN"), 334)
+    await expectCode(await client.sendCommand(Buffer.from(user).toString("base64")), 334)
+    await expectCode(await client.sendCommand(Buffer.from(password).toString("base64")), 235)
+    await expectCode(await client.sendCommand(`MAIL FROM:<${envelopeFrom}>`), 250)
+    await expectCode(await client.sendCommand(`RCPT TO:<${to}>`), 250)
+    await expectCode(await client.sendCommand("DATA"), 354)
+
+    client.write(`${message}\r\n.\r\n`)
+    await expectCode(await client.readResponse(), 250)
+
+    client.write("QUIT\r\n")
+  } finally {
+    client?.dispose()
+    socket?.end()
+  }
+}
+
+type ConnectionStrategy = "tls" | "starttls" | "plain"
+
+function resolveConnectionStrategy(port: number): ConnectionStrategy {
+  const configured = process.env.SMTP_CONNECTION_STRATEGY?.toLowerCase()
+
+  if (configured === "tls" || configured === "starttls" || configured === "plain") {
+    return configured
+  }
+
+  return port === 465 ? "tls" : "starttls"
+}
+
+async function openSmtpSocket({
+  host,
+  port,
+  strategy,
+}: {
+  host: string
+  port: number
+  strategy: ConnectionStrategy
+}) {
+  if (strategy === "tls") {
+    return await createTlsConnection(host, port)
+  }
+
+  return await createPlainConnection(host, port)
+}
+
+async function createTlsConnection(host: string, port: number) {
+  const socket = tls.connect({ host, port, servername: host })
+  await once(socket, "secureConnect")
+  return socket
+}
+
+async function createPlainConnection(host: string, port: number) {
+  const socket = net.connect({ host, port })
+  await once(socket, "connect")
+  return socket
+}
+
+async function upgradeToTls(socket: net.Socket, host: string) {
+  const tlsSocket = tls.connect({ socket, servername: host })
+  await once(tlsSocket, "secureConnect")
+  return tlsSocket
+}
+
+function configureSocket(socket: net.Socket | tls.TLSSocket) {
+  socket.setEncoding("utf8")
+  socket.setTimeout(15000, () => {
+    socket.destroy(new Error("SMTP connection timed out"))
   })
 }
 
@@ -149,6 +200,7 @@ type SmtpClient = {
   readResponse: () => Promise<SmtpResponse>
   sendCommand: (command: string) => Promise<SmtpResponse>
   write: (chunk: string) => void
+  dispose: () => void
 }
 
 type SmtpResponse = {
@@ -156,13 +208,13 @@ type SmtpResponse = {
   lines: string[]
 }
 
-function createSmtpClient(socket: tls.TLSSocket): SmtpClient {
+function createSmtpClient(socket: net.Socket | tls.TLSSocket): SmtpClient {
   let buffer = ""
   const queue: Array<{ resolve: (value: string) => void; reject: (error: Error) => void }> = []
   const readyLines: string[] = []
   let closed = false
 
-  socket.on("data", (data) => {
+  const onData = (data: string) => {
     buffer += data
 
     while (true) {
@@ -179,22 +231,26 @@ function createSmtpClient(socket: tls.TLSSocket): SmtpClient {
         readyLines.push(line)
       }
     }
-  })
+  }
 
-  socket.on("error", (error) => {
+  const onError = (error: Error) => {
     closed = true
     while (queue.length) {
       queue.shift()?.reject(error as Error)
     }
-  })
+  }
 
-  socket.on("close", () => {
+  const onClose = () => {
     if (closed) return
     const error = new Error("SMTP connection closed unexpectedly")
     while (queue.length) {
       queue.shift()?.reject(error)
     }
-  })
+  }
+
+  socket.on("data", onData)
+  socket.on("error", onError)
+  socket.on("close", onClose)
 
   const readLine = () =>
     new Promise<string>((resolve, reject) => {
@@ -237,6 +293,11 @@ function createSmtpClient(socket: tls.TLSSocket): SmtpClient {
     sendCommand,
     write: (chunk: string) => {
       socket.write(chunk)
+    },
+    dispose: () => {
+      socket.off("data", onData)
+      socket.off("error", onError)
+      socket.off("close", onClose)
     },
   }
 }
