@@ -1,3 +1,5 @@
+import tls from "node:tls"
+
 const EMAIL_TEMPLATES = {
   consultation: {
     subject: "Thanks for requesting your AI strategy session",
@@ -36,33 +38,211 @@ function buildHtml(name: string, intro: string) {
 }
 
 export async function sendConfirmationEmail({ to, name, template }: SendEmailOptions) {
-  const apiKey = process.env.RESEND_API_KEY
-  const fromAddress = process.env.RESEND_FROM_EMAIL || "BrandingBeez.io <noreply@brandingbeez.io>"
+  const smtpUser = process.env.SMTP_USER
+  const smtpPassword = process.env.SMTP_PASSWORD
+  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com"
+  const smtpPort = Number(process.env.SMTP_PORT) || 465
+  const fromAddress = process.env.SMTP_FROM_EMAIL || smtpUser
 
-  if (!apiKey) {
-    console.warn("RESEND_API_KEY is not configured. Skipping confirmation email for", to)
+  if (!smtpUser || !smtpPassword || !fromAddress) {
+    console.warn("SMTP credentials are not fully configured. Skipping confirmation email for", to)
     return
   }
 
   const selectedTemplate = EMAIL_TEMPLATES[template]
   const html = buildHtml(name?.trim() ?? "", selectedTemplate.intro)
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: fromAddress,
-      to: [to],
-      subject: selectedTemplate.subject,
-      html,
-    }),
+  await sendEmailThroughSmtp({
+    host: smtpHost,
+    port: smtpPort,
+    user: smtpUser,
+    password: smtpPassword,
+    from: fromAddress,
+    to,
+    subject: selectedTemplate.subject,
+    html,
+  })
+}
+
+type SmtpSendOptions = {
+  host: string
+  port: number
+  user: string
+  password: string
+  from: string
+  to: string
+  subject: string
+  html: string
+}
+
+async function sendEmailThroughSmtp(options: SmtpSendOptions) {
+  const { host, port, user, password, from, to, subject, html } = options
+
+  const message = buildMimeMessage({ from, to, subject, html })
+  const envelopeFrom = extractEmailAddress(from)
+
+  await new Promise<void>((resolve, reject) => {
+    const socket = tls.connect(
+      {
+        host,
+        port,
+        servername: host,
+      },
+      () => {
+        socket.setEncoding("utf8")
+
+        const client = createSmtpClient(socket)
+
+        ;(async () => {
+          try {
+            await expectCode(await client.readResponse(), 220)
+            await expectCode(await client.sendCommand(`EHLO brandingbeez.io`), 250)
+            await expectCode(await client.sendCommand("AUTH LOGIN"), 334)
+            await expectCode(await client.sendCommand(Buffer.from(user).toString("base64")), 334)
+            await expectCode(await client.sendCommand(Buffer.from(password).toString("base64")), 235)
+            await expectCode(await client.sendCommand(`MAIL FROM:<${envelopeFrom}>`), 250)
+            await expectCode(await client.sendCommand(`RCPT TO:<${to}>`), 250)
+            await expectCode(await client.sendCommand("DATA"), 354)
+
+            client.write(`${message}\r\n.\r\n`)
+            await expectCode(await client.readResponse(), 250)
+
+            client.write("QUIT\r\n")
+            resolve()
+          } catch (error) {
+            reject(error)
+          } finally {
+            socket.end()
+          }
+        })().catch(reject)
+      },
+    )
+
+    socket.setTimeout(15000, () => {
+      socket.destroy(new Error("SMTP connection timed out"))
+    })
+
+    socket.on("error", (error) => {
+      reject(error)
+    })
+  })
+}
+
+function buildMimeMessage({ from, to, subject, html }: { from: string; to: string; subject: string; html: string }) {
+  const headers = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/html; charset=UTF-8",
+  ]
+
+  return `${headers.join("\r\n")}\r\n\r\n${html}`
+}
+
+function extractEmailAddress(address: string) {
+  const match = address.match(/<([^>]+)>/) ?? address.match(/([^\s@]+@[^\s@]+)/)
+  return match ? match[1] ?? match[0] : address
+}
+
+type SmtpClient = {
+  readResponse: () => Promise<SmtpResponse>
+  sendCommand: (command: string) => Promise<SmtpResponse>
+  write: (chunk: string) => void
+}
+
+type SmtpResponse = {
+  code: number
+  lines: string[]
+}
+
+function createSmtpClient(socket: tls.TLSSocket): SmtpClient {
+  let buffer = ""
+  const queue: Array<{ resolve: (value: string) => void; reject: (error: Error) => void }> = []
+  const readyLines: string[] = []
+  let closed = false
+
+  socket.on("data", (data) => {
+    buffer += data
+
+    while (true) {
+      const newlineIndex = buffer.indexOf("\r\n")
+      if (newlineIndex === -1) break
+
+      const line = buffer.slice(0, newlineIndex)
+      buffer = buffer.slice(newlineIndex + 2)
+
+      const pending = queue.shift()
+      if (pending) {
+        pending.resolve(line)
+      } else {
+        readyLines.push(line)
+      }
+    }
   })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Failed to send confirmation email: ${response.status} ${errorText}`)
+  socket.on("error", (error) => {
+    closed = true
+    while (queue.length) {
+      queue.shift()?.reject(error as Error)
+    }
+  })
+
+  socket.on("close", () => {
+    if (closed) return
+    const error = new Error("SMTP connection closed unexpectedly")
+    while (queue.length) {
+      queue.shift()?.reject(error)
+    }
+  })
+
+  const readLine = () =>
+    new Promise<string>((resolve, reject) => {
+      const line = readyLines.shift()
+      if (line !== undefined) {
+        resolve(line)
+        return
+      }
+
+      queue.push({ resolve, reject })
+    })
+
+  const readResponse = async () => {
+    const firstLine = await readLine()
+    const code = parseInt(firstLine.slice(0, 3), 10)
+
+    if (Number.isNaN(code)) {
+      throw new Error(`Unexpected SMTP response: ${firstLine}`)
+    }
+
+    const lines = [firstLine]
+    if (firstLine[3] === "-") {
+      while (true) {
+        const nextLine = await readLine()
+        lines.push(nextLine)
+        if (nextLine.startsWith(`${code} `)) break
+      }
+    }
+
+    return { code, lines }
+  }
+
+  const sendCommand = async (command: string) => {
+    socket.write(`${command}\r\n`)
+    return readResponse()
+  }
+
+  return {
+    readResponse,
+    sendCommand,
+    write: (chunk: string) => {
+      socket.write(chunk)
+    },
+  }
+}
+
+async function expectCode(response: SmtpResponse, expectedCode: number) {
+  if (response.code !== expectedCode) {
+    throw new Error(`Unexpected SMTP response (expected ${expectedCode}): ${response.lines.join(" | ")}`)
   }
 }
