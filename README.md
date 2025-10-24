@@ -28,3 +28,17 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Database Configuration
+
+Consultation and footer lead submissions are now stored in an external PostgreSQL
+database. Set the following environment variables before running the application:
+
+| Variable | Description |
+| --- | --- |
+| `DATABASE_URL` | Connection string for your PostgreSQL instance. |
+| `PG_POOL_MAX` | *(Optional)* Maximum number of pooled connections (defaults to `5`). |
+| `PG_IDLE_TIMEOUT` | *(Optional)* Idle timeout in milliseconds for pool connections (defaults to `30000`). |
+| `PGSSL` | *(Optional)* Set to `disable` to skip SSL configuration. By default SSL is enabled in production with relaxed certificate validation. |
+
+Tables are created automatically on first use if they do not already exist.
