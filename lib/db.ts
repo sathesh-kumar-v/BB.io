@@ -101,7 +101,7 @@ async function ensureTables(client: PoolClient) {
 
 export async function ensureLeadTables(): Promise<void> {
   if (!tableSetupPromise) {
-    tableSetupPromise = (async () => {
+    const setupPromise = (async () => {
       const pool = getPool()
       const client = await pool.connect()
 
@@ -111,6 +111,11 @@ export async function ensureLeadTables(): Promise<void> {
         client.release()
       }
     })()
+    
+    tableSetupPromise = setupPromise.catch((error) => {
+      tableSetupPromise = null
+      throw error
+    })
   }
 
   return tableSetupPromise
