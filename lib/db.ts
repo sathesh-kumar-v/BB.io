@@ -3,6 +3,29 @@ import { Pool, type PoolClient } from "pg"
 let pool: Pool | null = null
 let tableSetupPromise: Promise<void> | null = null
 
+function shouldUseSSL(connectionString: string): boolean {
+  if (process.env.PGSSL === "disable") {
+    return false
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return true
+  }
+
+  try {
+    const { searchParams } = new URL(connectionString)
+    const sslMode = searchParams.get("sslmode")?.toLowerCase()
+
+    if (sslMode && ["require", "prefer"].includes(sslMode)) {
+      return true
+    }
+  } catch (error) {
+    console.warn("Failed to parse database connection string", error)
+  }
+
+  return false
+}
+
 function createPool() {
   const connectionString = process.env.DATABASE_URL
 
@@ -14,12 +37,7 @@ function createPool() {
     connectionString,
     max: Number.parseInt(process.env.PG_POOL_MAX ?? "5", 10),
     idleTimeoutMillis: Number.parseInt(process.env.PG_IDLE_TIMEOUT ?? "30000", 10),
-    ssl:
-      process.env.PGSSL === "disable"
-        ? undefined
-        : process.env.NODE_ENV === "production"
-          ? { rejectUnauthorized: false }
-          : undefined,
+    ssl: shouldUseSSL(connectionString) ? { rejectUnauthorized: false } : undefined,
   })
 }
 
