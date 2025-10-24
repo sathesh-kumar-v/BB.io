@@ -1,6 +1,5 @@
-import { promises as fs } from "fs"
-import path from "path"
 import { randomUUID } from "crypto"
+import { ensureLeadTables, getPool } from "./db"
 
 export type ConsultationPayload = {
   firstName: string
@@ -48,74 +47,160 @@ export type StoredFooterLead = FooterLeadPayload & {
   createdAt: string
 }
 
-type LeadDatabase = {
-  consultations: StoredConsultation[]
-  footerLeads: StoredFooterLead[]
-}
-
-const DATA_DIRECTORY = path.join(process.cwd(), "data")
-const DATA_FILE = path.join(DATA_DIRECTORY, "leads.json")
-
-const EMPTY_DATABASE: LeadDatabase = {
-  consultations: [],
-  footerLeads: [],
-}
-
-async function ensureDatabaseFile() {
-  await fs.mkdir(DATA_DIRECTORY, { recursive: true })
-
-  try {
-    await fs.access(DATA_FILE)
-  } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify(EMPTY_DATABASE, null, 2) + "\n", "utf8")
+function toIsoTimestamp(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString()
   }
-}
 
-async function readDatabase(): Promise<LeadDatabase> {
-  await ensureDatabaseFile()
-
-  try {
-    const raw = await fs.readFile(DATA_FILE, "utf8")
-    const parsed = JSON.parse(raw) as Partial<LeadDatabase>
-
-    return {
-      consultations: Array.isArray(parsed.consultations) ? parsed.consultations : [],
-      footerLeads: Array.isArray(parsed.footerLeads) ? parsed.footerLeads : [],
+  if (typeof value === "string") {
+    const date = new Date(value)
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString()
     }
-  } catch (error) {
-    console.error("Failed to read local database", error)
-    return { ...EMPTY_DATABASE }
   }
-}
 
-async function writeDatabase(payload: LeadDatabase) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(payload, null, 2) + "\n", "utf8")
+  return new Date().toISOString()
 }
 
 export async function storeConsultation(payload: ConsultationPayload): Promise<StoredConsultation> {
-  const database = await readDatabase()
-  const record: StoredConsultation = {
+  await ensureLeadTables()
+
+  const pool = getPool()
+  const id = randomUUID()
+
+  const result = await pool.query<{ created_at: string }>(
+    `
+      INSERT INTO consultations (
+        id,
+        first_name,
+        last_name,
+        email,
+        phone,
+        company,
+        industry,
+        industry_other,
+        company_size,
+        revenue,
+        bottleneck,
+        challenges,
+        challenges_other,
+        time_consumers,
+        automation_experience,
+        timeline,
+        driving_factors,
+        driving_factors_other,
+        consultation_format,
+        best_times,
+        additional_info,
+        hear_about,
+        referral_name,
+        email_updates,
+        weekly_insights,
+        event_notifications
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12,
+        $13,
+        $14,
+        $15,
+        $16,
+        $17,
+        $18,
+        $19,
+        $20,
+        $21,
+        $22,
+        $23,
+        $24,
+        $25,
+        $26
+      )
+      RETURNING created_at
+    `,
+    [
+      id,
+      payload.firstName,
+      payload.lastName,
+      payload.email,
+      payload.phone,
+      payload.company,
+      payload.industry,
+      payload.industryOther ?? null,
+      payload.companySize,
+      payload.revenue ?? null,
+      payload.bottleneck,
+      payload.challenges,
+      payload.challengesOther ?? null,
+      payload.timeConsumers ?? null,
+      payload.automationExperience,
+      payload.timeline,
+      payload.drivingFactors,
+      payload.drivingFactorsOther ?? null,
+      payload.consultationFormat,
+      payload.bestTimes,
+      payload.additionalInfo ?? null,
+      payload.hearAbout ?? null,
+      payload.referralName ?? null,
+      payload.emailUpdates,
+      payload.weeklyInsights,
+      payload.eventNotifications,
+    ],
+  )
+
+  const createdAt = toIsoTimestamp(result.rows[0]?.created_at)
+
+  return {
     ...payload,
-    id: randomUUID(),
-    createdAt: new Date().toISOString(),
+    id,
+    createdAt,
   }
-
-  database.consultations.push(record)
-  await writeDatabase(database)
-
-  return record
 }
 
 export async function storeFooterLead(payload: FooterLeadPayload): Promise<StoredFooterLead> {
-  const database = await readDatabase()
-  const record: StoredFooterLead = {
+  await ensureLeadTables()
+
+  const pool = getPool()
+  const id = randomUUID()
+
+  const result = await pool.query<{ created_at: string }>(
+    `
+      INSERT INTO footer_leads (
+        id,
+        name,
+        email,
+        company_name,
+        industry,
+        preferred_call_time
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING created_at
+    `,
+    [
+      id,
+      payload.name,
+      payload.email,
+      payload.companyName,
+      payload.industry,
+      payload.preferredCallTime,
+    ],
+  )
+
+  const createdAt = toIsoTimestamp(result.rows[0]?.created_at)
+
+  return {
     ...payload,
-    id: randomUUID(),
-    createdAt: new Date().toISOString(),
+    id,
+    createdAt,
   }
-
-  database.footerLeads.push(record)
-  await writeDatabase(database)
-
-  return record
 }
