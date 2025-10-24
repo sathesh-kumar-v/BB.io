@@ -3,6 +3,40 @@ import { Pool, type PoolClient } from "pg"
 let pool: Pool | null = null
 let tableSetupPromise: Promise<void> | null = null
 
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error
+}
+
+function isRecoverableConnectionError(error: unknown): error is NodeJS.ErrnoException {
+  if (!isNodeError(error)) {
+    return false
+  }
+
+  const code = error.code
+
+  if (typeof code !== "string") {
+    return false
+  }
+
+  return ["ECONNRESET", "ETIMEDOUT", "EPIPE"].includes(code)
+}
+
+async function resetPool(currentPool: Pool | null) {
+  if (!currentPool) {
+    return
+  }
+
+  try {
+    await currentPool.end()
+  } catch (error) {
+    console.error("Failed to gracefully close Postgres pool", error)
+  } finally {
+    if (pool === currentPool) {
+      pool = null
+    }
+  }
+}
+
 function shouldUseSSL(connectionString: string): boolean {
   if (process.env.PGSSL === "disable") {
     return false
@@ -99,19 +133,35 @@ async function ensureTables(client: PoolClient) {
   `)
 }
 
+async function ensureTablesWithClient(attempt = 0): Promise<void> {
+  const poolInstance = getPool()
+
+  try {
+    const client = await poolInstance.connect()
+
+    try {
+      await ensureTables(client)
+    } finally {
+      client.release()
+    }
+  } catch (error) {
+    if (isRecoverableConnectionError(error) && attempt < 3) {
+      console.warn(
+        `Postgres connection failed with ${error.code}. Retrying (${attempt + 1}/3).`,
+      )
+
+      await resetPool(poolInstance)
+      return ensureTablesWithClient(attempt + 1)
+    }
+
+    throw error
+  }
+}
+
 export async function ensureLeadTables(): Promise<void> {
   if (!tableSetupPromise) {
-    const setupPromise = (async () => {
-      const pool = getPool()
-      const client = await pool.connect()
+    const setupPromise = ensureTablesWithClient()
 
-      try {
-        await ensureTables(client)
-      } finally {
-        client.release()
-      }
-    })()
-    
     tableSetupPromise = setupPromise.catch((error) => {
       tableSetupPromise = null
       throw error
