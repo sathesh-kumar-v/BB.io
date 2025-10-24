@@ -37,27 +37,47 @@ async function resetPool(currentPool: Pool | null) {
   }
 }
 
+function isLocalDatabaseHost(hostname: string): boolean {
+  const normalizedHost = hostname.toLowerCase()
+
+  if (["localhost", "127.0.0.1", "::1"].includes(normalizedHost)) {
+    return true
+  }
+
+  return normalizedHost.endsWith(".local")
+}
+
 function shouldUseSSL(connectionString: string): boolean {
   if (process.env.PGSSL === "disable") {
     return false
   }
 
-  if (process.env.NODE_ENV === "production") {
-    return true
-  }
-
   try {
-    const { searchParams } = new URL(connectionString)
-    const sslMode = searchParams.get("sslmode")?.toLowerCase()
+    const parsedUrl = new URL(connectionString)
+    const { hostname, searchParams } = parsedUrl
 
+    const sslMode = searchParams.get("sslmode")?.toLowerCase()
     if (sslMode && ["require", "prefer"].includes(sslMode)) {
+      return true
+    }
+
+    const sslEnabled = searchParams.get("ssl")?.toLowerCase()
+    if (sslEnabled === "true" || sslEnabled === "1") {
+      return true
+    }
+
+    if (!isLocalDatabaseHost(hostname)) {
       return true
     }
   } catch (error) {
     console.warn("Failed to parse database connection string", error)
+
+    if (process.env.NODE_ENV === "production") {
+      return true
+    }
   }
 
-  return false
+  return process.env.NODE_ENV === "production"
 }
 
 function createPool() {
