@@ -24,10 +24,12 @@ export function CoreIndustriesSection() {
           {/* Property Management */}
           <div className="bg-[#111111] border border-[#262626] rounded-2xl p-8 hover:border-[#6366f1]/50 transition-all">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-[#6366f1]/10 rounded-xl flex items-center justify-center">
+              <div className="w-16 h-16 bg-[#6366f1]/10 rounded-xl flex items-center justify-center flex-shrink-0">
                 <Building2 className="w-8 h-8 text-[#6366f1]" />
               </div>
-              <h3 className="text-3xl font-bold text-white">Property Management Intelligence</h3>
+              <h3 className="text-2xl md:text-3xl font-bold text-white whitespace-nowrap">
+                Property Management Intelligence
+              </h3>
             </div>
 
             <p className="text-[#a1a1aa] mb-6 leading-relaxed">
@@ -63,7 +65,7 @@ export function CoreIndustriesSection() {
             </div>
 
             <div className="bg-[#6366f1]/10 border border-[#6366f1]/20 rounded-xl p-4 mb-6">
-              <p className="text-white text-sm italic leading-relaxed">
+              <p className="text-white text-sm italic leading-relaxed line-clamp-2">
                 "Property management companies using our systems process 3x more applications with the same staff while
                 reducing screening time from days to hours."
               </p>
@@ -96,10 +98,10 @@ export function CoreIndustriesSection() {
           {/* Legal Firms */}
           <div className="bg-[#111111] border border-[#262626] rounded-2xl p-8 hover:border-[#6366f1]/50 transition-all">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-[#6366f1]/10 rounded-xl flex items-center justify-center">
+              <div className="w-16 h-16 bg-[#6366f1]/10 rounded-xl flex items-center justify-center flex-shrink-0">
                 <Scale className="w-8 h-8 text-[#6366f1]" />
               </div>
-              <h3 className="text-3xl font-bold text-white">Legal Practice Automation</h3>
+              <h3 className="text-2xl md:text-3xl font-bold text-white whitespace-nowrap">Legal Practice Automation</h3>
             </div>
 
             <p className="text-[#a1a1aa] mb-6 leading-relaxed">

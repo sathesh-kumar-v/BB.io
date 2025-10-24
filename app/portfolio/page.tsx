@@ -5,7 +5,7 @@ import { ArrowRight, Users } from "lucide-react"
 
 export default function PortfolioPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Hero Section */}
       <section className="border-b border-border">
         <div className="container mx-auto px-4 py-16 md:py-24">
@@ -58,11 +58,11 @@ export default function PortfolioPage() {
               features={["Lead automation", "Pipeline tracking", "Quote generation", "Client management"]}
               techStack={["Custom Web App", "API Integrations", "Automated Workflows"]}
               timeline="2 months Phase 1, scalable"
-              image="/modern-crm-dashboard-with-pipeline-and-sales-track.jpg"
+              image="/AC-Graphics.jpg"
             />
 
             <CaseStudyCard
-              title="Digital Identity Platform"
+              title="MyVKard"
               industry="SaaS Startup"
               badge="Rapid MVP Development"
               investment="$2.3K"
@@ -72,7 +72,7 @@ export default function PortfolioPage() {
               features={["NFC integration", "Payment processing", "Profile builder", "QR code generation"]}
               techStack={["React", "Node.js", "Stripe API", "NFC Protocols"]}
               timeline="7 weeks from concept to launch"
-              image="/nfc-digital-identity-card-with-mobile-app-interfac.jpg"
+              image="/myvkard_nfc1.png"
             />
 
             <CaseStudyCard
@@ -86,7 +86,7 @@ export default function PortfolioPage() {
               features={["Bluetooth connectivity", "AI health coach", "Progress tracking", "Personalized insights"]}
               techStack={["React Native", "Bluetooth APIs", "AI Integration"]}
               timeline="6 weeks mobile development"
-              image="/mobile-health-app-with-bluetooth-device-and-ai-coa.jpg"
+              image="/Wellenpuls_App.png"
             />
 
             <CaseStudyCard

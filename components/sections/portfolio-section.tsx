@@ -5,7 +5,7 @@ export function PortfolioSection() {
   const projects = [
     {
       name: "Octupus.ai",
-      image: "/ai-social-media-automation-dashboard-with-analytic.jpg",
+      image: "/octupus.png",
       industry: "Telecom",
       description: "AI-powered social media automation platform",
       roi: "56%",
@@ -13,15 +13,15 @@ export function PortfolioSection() {
     },
     {
       name: "AC Graphics CRM",
-      image: "/modern-crm-dashboard-with-sales-pipeline-and-custo.jpg",
+      image: "/AC-Graphics.jpg",
       industry: "Manufacturing",
       description: "Custom CRM with intelligent workflows",
       roi: "226%",
       value: "$7.5K",
     },
     {
-      name: "Digital Identity Platform",
-      image: "/nfc-card-reader-with-mobile-app-for-secure-identit.jpg",
+      name: "MyVKard",
+      image: "/myvkard_nfc1.png",
       industry: "SaaS",
       description: "NFC-enabled identity verification platform",
       roi: "422%",
@@ -29,7 +29,7 @@ export function PortfolioSection() {
     },
     {
       name: "Wellenpuls Health App",
-      image: "/mobile-health-app-with-ai-coaching-and-wellness-tr.jpg",
+      image: "/Wellenpuls_App.png",
       industry: "HealthTech",
       description: "AI health coaching mobile application",
       roi: "669%",

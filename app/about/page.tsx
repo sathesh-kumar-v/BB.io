@@ -3,9 +3,19 @@ import { Footer } from "@/components/footer"
 import { MapPin, Users, Globe, Award, TrendingUp, Heart } from "lucide-react"
 
 export default function AboutPage() {
-  const regionalPartners = [
+
+    type RegionalPartnersMember = {
+    name: string;
+    title: string;
+    location: string;
+    role: string;
+    expertise: string[];
+    contact: string;
+    image?: string;
+  };
+  const regionalPartners: RegionalPartnersMember[] = [
     {
-      name: "Ken Mitchell",
+      name: "Ken",
       title: "Business Partner - United States",
       location: "Nationwide USA Coverage",
       role: "Ken represents BrandingBeez.io across the United States, connecting with local businesses and forums to bring AI automation solutions to American SMBs.",
@@ -16,9 +26,10 @@ export default function AboutPage() {
         "Regional compliance and business practices",
       ],
       contact: "Reach Ken for US-based projects and consultations",
+      image: "/Ken.png",
     },
     {
-      name: "Matt Rodriguez",
+      name: "Matt",
       title: "Business Partner - Miami/Southeast",
       location: "Miami, Florida & Southeast Region",
       role: "Matt focuses on the vibrant Miami business ecosystem and Southeast markets, specializing in connecting with local entrepreneurs and established businesses.",
@@ -29,9 +40,10 @@ export default function AboutPage() {
         "Regional market insights and opportunities",
       ],
       contact: "Connect with Matt for Southeast US projects",
+      // image: "/Matt.png",
     },
     {
-      name: "Philip Weber",
+      name: "Phillip Einetter",
       title: "Business Partner - Germany/Europe",
       location: "Germany & European Markets",
       role: "Philip brings BrandingBeez.io's AI solutions to German and European businesses, navigating GDPR compliance and regional business practices.",
@@ -42,6 +54,7 @@ export default function AboutPage() {
         "Multi-language project coordination",
       ],
       contact: "Contact Philip for European projects and consultations",
+      image: "/Phillip.png",
     },
   ]
 
@@ -53,7 +66,6 @@ export default function AboutPage() {
     philosophy: string;
     image?: string;
   };
-
 
   const leadership: LeadershipMember[] = [
     {
@@ -82,9 +94,9 @@ export default function AboutPage() {
         "Team leadership and development",
         "Business growth and expansion",
       ],
-      image: "/Raje.png",
       philosophy:
         "Results speak louder than promises. We measure our success by our clients' success, and every project must deliver clear ROI.",
+      image: "/Raje.png",
     },
     {
       name: "Charan",
@@ -97,20 +109,20 @@ export default function AboutPage() {
         "Future-proofing client solutions",
         "Industry trend analysis and application",
       ],
-      image: "/Charan.png",
       philosophy:
         "We don't just implement today's AI - we build foundations that adapt and grow with tomorrow's innovations.",
+      image: "/Charan.png",
     },
   ];
 
   type CoreTeamMember = {
-    name: string
-    title: string
-    specialization: string
-    expertise: string
-    projects: string
-    image?: string
-  }
+    name: string;
+    title: string;
+    specialization: string;
+    expertise: string;
+    projects: string;
+    image?: string;
+  };
 
   const coreTeam: CoreTeamMember[] = [
     {
@@ -119,7 +131,7 @@ export default function AboutPage() {
       specialization: "Machine Learning & AI Integration Expert",
       expertise: "GPT-4 integration, custom ML models, intelligent automation systems",
       projects: "Lead developer on Octupus.ai and Wellenpuls AI coaching systems",
-      image: "/Mathavan_Stroke.png",
+      image: "/Mathavan.png",
     },
     {
       name: "Logu",
@@ -159,7 +171,7 @@ export default function AboutPage() {
       specialization: "Full-Stack Application Architecture",
       expertise: "Modern web development, database optimization, system integration",
       projects: "Complex business system integrations and custom applications",
-      image: "/Sathish_Stroke.png",
+      image: "/Sathesh_1.png",
     },
     {
       name: "Azeez",
@@ -203,7 +215,7 @@ export default function AboutPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       <Navigation />
 
       {/* Hero Section */}
@@ -242,7 +254,7 @@ export default function AboutPage() {
             <div className="relative">
               <div className="aspect-[4/3] rounded-2xl overflow-hidden border border-border bg-gradient-to-br from-primary/20 to-primary/5">
                 <img
-                  src="/professional-business-team-photo-with-three-leader.jpg"
+                  src="/TeamLeadership.jpg"
                   alt="Leadership Team: Vignesh, Raje, and Charan"
                   className="w-full h-full object-cover"
                 />
@@ -277,7 +289,11 @@ export default function AboutPage() {
               >
                 <div className="aspect-square rounded-xl overflow-hidden mb-4 bg-gradient-to-br from-primary/20 to-primary/5">
                   <img
-                    src={`/professional-business-partner-headshot-.jpg?height=400&width=400&query=professional business partner headshot ${partner.name}`}
+                    src={
+                      partner.image
+                      ? partner.image
+                      : `/professional-business-partner-headshot-.jpg?height=400&width=400&query=professional business partner headshot ${partner.name}`
+                    }
                     alt={partner.name}
                     className="w-full h-full object-cover"
                   />
@@ -627,7 +643,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <Footer />
     </div>
   )
 }

@@ -12,7 +12,6 @@ export function MultiStepConsultationForm() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     // Step 1: Basic Contact
@@ -71,31 +70,10 @@ export function MultiStepConsultationForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitError(null)
     setIsSubmitting(true)
-
-    try {
-      const response = await fetch("/api/consultations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      })
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}))
-        throw new Error((payload as { error?: string }).error || "Unable to submit your request right now.")
-      }
-
-      setIsSubmitted(true)
-    } catch (error) {
-      if (error instanceof Error) {
-        setSubmitError(error.message)
-      } else {
-        setSubmitError("Something went wrong. Please try again in a moment.")
-      }
-    } finally {
-      setIsSubmitting(false)
-    }
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    setIsSubmitted(true)
+    setIsSubmitting(false)
   }
 
   if (isSubmitted) {
@@ -585,8 +563,6 @@ export function MultiStepConsultationForm() {
           </div>
         </div>
       )}
-
-      {submitError ? <p className="text-sm text-red-400">{submitError}</p> : null}
 
       {/* Navigation Buttons */}
       <div className="flex items-center justify-between pt-6">

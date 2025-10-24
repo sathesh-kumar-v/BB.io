@@ -80,32 +80,36 @@ export function SimplifiedSolutionsSection() {
           {solutions.map((solution, index) => (
             <div
               key={index}
-              className="bg-white border border-[#e5e5e5] rounded-xl p-6 hover:shadow-xl hover:border-[#6366f1]/50 transition-all"
+              className="bg-white border border-[#e5e5e5] rounded-xl p-6 hover:shadow-xl hover:border-[#6366f1]/50 transition-all flex flex-col"
             >
-              <div className="w-12 h-12 bg-[#6366f1]/10 rounded-lg flex items-center justify-center mb-4">
-                <solution.icon className="w-6 h-6 text-[#6366f1]" />
+              <div className="flex-grow">
+                <div className="w-12 h-12 bg-[#6366f1]/10 rounded-lg flex items-center justify-center mb-4">
+                  <solution.icon className="w-6 h-6 text-[#6366f1]" />
+                </div>
+
+                <h3 className="text-xl font-bold text-[#0a0a0a] mb-3">{solution.headline}</h3>
+
+                <p className="text-[#71717a] text-sm mb-4 leading-relaxed">{solution.description}</p>
+
+                <div className="space-y-2 mb-4">
+                  {solution.examples.map((example, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="text-[#6366f1] text-xs mt-1">•</span>
+                      <span className="text-[#52525b] text-xs">{example}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <h3 className="text-xl font-bold text-[#0a0a0a] mb-3">{solution.headline}</h3>
-
-              <p className="text-[#71717a] text-sm mb-4 leading-relaxed">{solution.description}</p>
-
-              <div className="space-y-2 mb-4">
-                {solution.examples.map((example, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-[#6366f1] text-xs mt-1">•</span>
-                    <span className="text-[#52525b] text-xs">{example}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-[#10b981]/10 border border-[#10b981]/20 rounded-lg px-3 py-2 mb-4">
+              <div className="bg-[#10b981]/10 border border-[#10b981]/20 rounded-lg px-3 py-2 mt-4 mb-4">
                 <span className="text-[#10b981] text-sm font-semibold">{solution.benefit}</span>
               </div>
 
-              <Link href={solution.link}>
-                <Button className="w-full bg-[#6366f1] hover:bg-[#6366f1]/90 text-white">Learn More</Button>
-              </Link>
+              <div className="flex justify-end mt-auto">
+                <Link href={solution.link}>
+                  <Button className="bg-[#6366f1] hover:bg-[#6366f1]/90 text-white px-6 py-2">Learn More</Button>
+                </Link>
+              </div>
             </div>
           ))}
         </div>

@@ -19,32 +19,20 @@ export function Navigation() {
     {
       title: "Custom CRM Development",
       label: "Phase-Based",
-      href: "/services/crm",
+      href: "/services/custom-crm",
       description: "Tailored sales & customer management systems",
     },
     {
       title: "AI Chatbots & Virtual Assistants",
       label: "24/7 Solution",
-      href: "/services/chatbots",
+      href: "/services/ai-chatbots",
       description: "Automated customer support & engagement",
     },
     {
       title: "Mobile App Development",
       label: "iOS & Android",
-      href: "/services/mobile",
+      href: "/services/mobile-apps",
       description: "Native & cross-platform mobile solutions",
-    },
-    {
-      title: "Business Intelligence & Analytics",
-      label: "Predictive",
-      href: "/services/analytics",
-      description: "Data-driven insights & forecasting",
-    },
-    {
-      title: "AI Integration & Consultation",
-      label: "Enhance Existing",
-      href: "/services/consultation",
-      description: "Upgrade your current systems with AI",
     },
   ]
 
@@ -52,10 +40,9 @@ export function Navigation() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-4">
-            <Image src="/logo-icon.png" alt="BrandingBeez.io" width={56} height={56} className="h-14 w-14" priority />
-            <span className="text-2xl font-bold text-foreground">BrandingBeez.io</span>
+          <Link href="/" className="flex items-center gap-3">
+            <Image src="/Brandingbeez2-21.svg" alt="BrandingBeez.io" width={42} height={42} className="h-42 w-42" priority />
+            <span className="text-2xl font-bold text-foreground"></span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -92,14 +79,6 @@ export function Navigation() {
                       </Link>
                     ))}
                   </div>
-                  <div className="p-4 bg-accent/50 border-t border-border">
-                    <Link
-                      href="/services"
-                      className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-                    >
-                      View All Services →
-                    </Link>
-                  </div>
                 </div>
               )}
             </div>
@@ -117,7 +96,7 @@ export function Navigation() {
               About
             </Link>
             <Link
-              href="/contact"
+              href="/get-started"
               className="px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
             >
               Get Started
@@ -188,7 +167,7 @@ export function Navigation() {
                 About
               </Link>
               <Link
-                href="/contact"
+                href="/get-started"
                 className="px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors text-center"
                 onClick={() => setIsOpen(false)}
               >

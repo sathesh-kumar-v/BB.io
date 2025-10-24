@@ -1,5 +1,3 @@
-import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import { HeroWithForm } from "@/components/sections/hero-with-form"
 import { CoreIndustriesSection } from "@/components/sections/core-industries-section"
 import { AutomationSection } from "@/components/sections/automation-section"
@@ -12,7 +10,6 @@ import { ScrollAnimation } from "@/components/scroll-animation"
 export default function HomePage() {
   return (
     <main className="min-h-screen">
-      <Navigation />
       <ScrollAnimation animation="fade-up">
         <HeroWithForm />
       </ScrollAnimation>
@@ -22,7 +19,7 @@ export default function HomePage() {
       <ScrollAnimation animation="slide-left" delay={150}>
         <AutomationSection />
       </ScrollAnimation>
-      <ScrollAnimation animation="stagger-glow" delay={200}>
+      <ScrollAnimation animation="neon-glow" delay={200}>
         <SimplifiedSolutionsSection />
       </ScrollAnimation>
       <ScrollAnimation animation="slide-right" delay={150}>
@@ -34,7 +31,6 @@ export default function HomePage() {
       <ScrollAnimation animation="fade-up" delay={150}>
         <LeadMagnetsSection />
       </ScrollAnimation>
-      <Footer />
     </main>
   )
 }

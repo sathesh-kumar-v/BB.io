@@ -1,3 +1,5 @@
+"use client"
+
 import { StatCard } from "@/components/admin/stat-card"
 import { FileText, Calendar, Users, Mail, Activity } from "lucide-react"
 import { Card } from "@/components/ui/card"

@@ -1,6 +1,8 @@
 import type React from "react"
 import { Outfit, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
+import { Navigation } from "@/components/navigation"
+import { Footer } from "@/components/footer"
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -18,7 +20,7 @@ export const metadata = {
   title: "BrandingBeez.io - Lean AI Development Agency",
   description:
     "Enterprise-quality AI solutions at 50-70% below market rates. Proven 325% average ROI. Custom GPT-4 integrations, ML models, and automation platforms.",
-    generator: 'v0.app'
+  generator: "v0.app",
 }
 
 export default function RootLayout({
@@ -28,7 +30,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${outfit.variable} ${jetbrainsMono.variable} antialiased`}>
-      <body>{children}</body>
+      <body>
+        <Navigation />
+        {children}
+        <Footer />
+      </body>
     </html>
   )
 }

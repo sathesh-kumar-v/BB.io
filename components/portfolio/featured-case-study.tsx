@@ -15,7 +15,7 @@ export function FeaturedCaseStudy() {
       {/* Hero Section */}
       <div className="relative h-[400px] bg-gradient-to-br from-primary/20 to-background">
         <Image
-          src="/ai-social-media-automation-dashboard-with-analytic.jpg"
+          src="/octupus.png"
           alt="Octupus.ai Dashboard"
           fill
           className="object-cover"

@@ -31,7 +31,7 @@ export default function CustomCRMPage() {
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-background to-muted/20 py-20 lg:py-32">
         <div className="container mx-auto px-4">

@@ -25,7 +25,7 @@ export function AdminSidebar() {
       {/* Logo */}
       <div className="h-20 flex items-center px-6 border-b border-sidebar-border">
         <Link href="/admin" className="flex items-center gap-3">
-          <Image src="/logo-icon.png" alt="BrandingBeez.io" width={40} height={40} className="w-10 h-10" />
+          <Image src="/Brandingbeez2-21.svg" alt="BrandingBeez.io" width={42} height={42} className="w-42 h-42" />
           <div>
             <div className="font-bold text-sidebar-foreground text-lg">BrandingBeez</div>
             <div className="text-xs text-muted-foreground">Admin Panel</div>
