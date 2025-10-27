@@ -47,6 +47,18 @@ export type StoredFooterLead = FooterLeadPayload & {
   createdAt: string
 }
 
+export type FormSubmission = {
+  id: string
+  type: "Consultation" | "Footer Lead"
+  name: string
+  email: string
+  phone?: string | null
+  company?: string | null
+  details?: string | null
+  source: string
+  createdAt: string
+}
+
 function toIsoTimestamp(value: unknown): string {
   if (value instanceof Date) {
     return value.toISOString()
@@ -165,6 +177,120 @@ export async function storeConsultation(payload: ConsultationPayload): Promise<S
     id,
     createdAt,
   }
+}
+
+type ConsultationRow = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  company: string
+  bottleneck: string
+  additional_info: string | null
+  hear_about: string | null
+  created_at: string
+}
+
+type FooterLeadRow = {
+  id: string
+  name: string
+  email: string
+  company_name: string
+  industry: string
+  preferred_call_time: string
+  created_at: string
+}
+
+function normalizeString(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+export async function fetchFormSubmissions(): Promise<FormSubmission[]> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+
+  const [consultationResult, footerLeadResult] = await Promise.all([
+    pool.query<ConsultationRow>(
+      `
+        SELECT
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          company,
+          bottleneck,
+          additional_info,
+          hear_about,
+          created_at
+        FROM consultations
+      `,
+    ),
+    pool.query<FooterLeadRow>(
+      `
+        SELECT
+          id,
+          name,
+          email,
+          company_name,
+          industry,
+          preferred_call_time,
+          created_at
+        FROM footer_leads
+      `,
+    ),
+  ])
+
+  const consultationSubmissions: FormSubmission[] = consultationResult.rows.map((row) => {
+    const createdAt = toIsoTimestamp(row.created_at)
+    const details = normalizeString(row.additional_info) ?? normalizeString(row.bottleneck)
+    const heardFrom = normalizeString(row.hear_about)
+    const company = normalizeString(row.company)
+    const phone = normalizeString(row.phone)
+    const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+
+    return {
+      id: row.id,
+      type: "Consultation",
+      name: fullName || row.first_name || row.last_name,
+      email: row.email,
+      phone: phone ?? undefined,
+      company: company ?? undefined,
+      details: details ?? undefined,
+      source: heardFrom ? `Consultation Form (${heardFrom})` : "Consultation Form",
+      createdAt,
+    }
+  })
+
+  const footerLeadSubmissions: FormSubmission[] = footerLeadResult.rows.map((row) => {
+    const createdAt = toIsoTimestamp(row.created_at)
+    const industry = normalizeString(row.industry)
+    const preferredCall = normalizeString(row.preferred_call_time)
+    const infoParts = [
+      industry ? `Industry: ${industry}` : null,
+      preferredCall ? `Preferred call: ${preferredCall}` : null,
+    ].filter(Boolean) as string[]
+    const company = normalizeString(row.company_name)
+    const name = normalizeString(row.name) ?? row.name
+
+    return {
+      id: row.id,
+      type: "Footer Lead",
+      name,
+      email: row.email,
+      company: company ?? undefined,
+      details: infoParts.length > 0 ? infoParts.join(" • ") : undefined,
+      source: "Footer Lead Form",
+      createdAt,
+    }
+  })
+
+  return [...consultationSubmissions, ...footerLeadSubmissions].sort((a, b) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
 }
 
 export async function storeFooterLead(payload: FooterLeadPayload): Promise<StoredFooterLead> {

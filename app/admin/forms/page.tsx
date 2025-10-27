@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -9,156 +9,205 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 
-// Mock data - replace with real data from your backend
-const mockSubmissions = [
-  {
-    id: 1,
-    name: "John Doe",
-    email: "john@example.com",
-    phone: "+1 234 567 8900",
-    message: "Interested in AI automation for my law firm",
-    source: "Contact Form",
-    type: "Contact",
-    date: "2025-01-15T10:30:00",
-  },
-  {
-    id: 2,
-    name: "Sarah Smith",
-    email: "sarah@example.com",
-    phone: "+1 234 567 8901",
-    message: "Need consultation for property management CRM",
-    source: "Consultation Form",
-    type: "Consultation",
-    date: "2025-01-15T09:15:00",
-  },
-  {
-    id: 3,
-    name: "Mike Johnson",
-    email: "mike@example.com",
-    phone: "+1 234 567 8902",
-    message: "Want to join the community",
-    source: "Community Page",
-    type: "Community",
-    date: "2025-01-14T16:45:00",
-  },
-  {
-    id: 4,
-    name: "Jane Wilson",
-    email: "jane@example.com",
-    phone: "+1 234 567 8903",
-    message: "Subscribe to newsletter",
-    source: "Newsletter Form",
-    type: "Newsletter",
-    date: "2025-01-14T14:20:00",
-  },
-]
+type FormSubmission = {
+  id: string
+  type: string
+  name: string
+  email: string
+  phone?: string
+  company?: string
+  details?: string
+  source: string
+  createdAt: string
+}
 
 export default function FormsPage() {
+  const [submissions, setSubmissions] = useState<FormSubmission[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("all")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filteredSubmissions = mockSubmissions.filter((submission) => {
-    const matchesSearch =
-      submission.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      submission.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      submission.message.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    const controller = new AbortController()
 
-    const matchesFilter = filterType === "all" || submission.type === filterType
+    async function loadSubmissions() {
+      setLoading(true)
+      setError(null)
 
-    return matchesSearch && matchesFilter
-  })
+      try {
+        const response = await fetch("/api/forms", { signal: controller.signal })
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`)
+        }
+
+        const data = (await response.json()) as { submissions?: FormSubmission[] }
+        setSubmissions(data.submissions ?? [])
+      } catch (fetchError) {
+        if ((fetchError as Error).name === "AbortError") {
+          return
+        }
+
+        console.error("Unable to load submissions", fetchError)
+        setError("We couldn't load the latest submissions. Please try again later.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadSubmissions()
+
+    return () => {
+      controller.abort()
+    }
+  }, [])
+
+  const submissionTypes = useMemo(() => {
+    const types = new Set<string>()
+    for (const submission of submissions) {
+      if (submission.type) {
+        types.add(submission.type)
+      }
+    }
+    return Array.from(types).sort((a, b) => a.localeCompare(b))
+  }, [submissions])
+
+  const filteredSubmissions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    return submissions.filter((submission) => {
+      const matchesFilter = filterType === "all" || submission.type === filterType
+
+      if (!matchesFilter) {
+        return false
+      }
+
+      if (!normalizedQuery) {
+        return true
+      }
+
+      const haystack = [
+        submission.name,
+        submission.email,
+        submission.phone,
+        submission.company,
+        submission.details,
+        submission.source,
+      ]
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.toLowerCase())
+
+      return haystack.some((value) => value.includes(normalizedQuery))
+    })
+  }, [submissions, filterType, searchQuery])
 
   const handleExportCSV = () => {
-    const headers = ["Name", "Email", "Phone", "Message", "Source", "Type", "Date"]
-    const csvData = filteredSubmissions.map((sub) => [
-      sub.name,
-      sub.email,
-      sub.phone,
-      sub.message,
-      sub.source,
-      sub.type,
-      new Date(sub.date).toLocaleString(),
+    const headers = ["Name", "Email", "Phone", "Company", "Details", "Source", "Type", "Submitted"]
+
+    const csvData = filteredSubmissions.map((submission) => [
+      submission.name,
+      submission.email,
+      submission.phone ?? "",
+      submission.company ?? "",
+      submission.details ?? "",
+      submission.source,
+      submission.type,
+      new Date(submission.createdAt).toLocaleString(),
     ])
 
-    const csvContent = [headers.join(","), ...csvData.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map((row) =>
+        row
+          .map((cell) => {
+            const normalized = cell.replace(/"/g, '""')
+            return `"${normalized}"`
+          })
+          .join(","),
+      ),
+    ].join("\n")
 
     const blob = new Blob([csvContent], { type: "text/csv" })
     const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `form-submissions-${new Date().toISOString().split("T")[0]}.csv`
-    a.click()
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `form-submissions-${new Date().toISOString().split("T")[0]}.csv`
+    anchor.click()
+    window.URL.revokeObjectURL(url)
   }
 
   const getTypeBadgeColor = (type: string) => {
     switch (type) {
-      case "Contact":
-        return "bg-blue-500/10 text-blue-400 border-blue-500/20"
       case "Consultation":
         return "bg-purple-500/10 text-purple-400 border-purple-500/20"
-      case "Community":
-        return "bg-green-500/10 text-green-400 border-green-500/20"
-      case "Newsletter":
-        return "bg-primary/10 text-primary border-primary/20"
+      case "Footer Lead":
+        return "bg-blue-500/10 text-blue-400 border-blue-500/20"
       default:
         return "bg-muted/10 text-muted-foreground border-border"
     }
   }
 
+  const resultsSummary = loading
+    ? "Loading submissions..."
+    : error
+      ? "Unable to display submissions."
+      : `Showing ${filteredSubmissions.length} of ${submissions.length} submissions`
+
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold text-foreground">Form Submissions</h1>
-        <p className="text-muted-foreground mt-1">Manage all website form submissions in one place</p>
+        <p className="text-muted-foreground mt-1">
+          Manage all website form submissions collected from your lead capture flows
+        </p>
       </div>
 
-      {/* Filters and Actions */}
       <Card className="p-4 border-border bg-card">
         <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 type="search"
-                placeholder="Search by name, email, or message..."
+                placeholder="Search by name, email, company, or keyword..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 className="pl-10"
               />
             </div>
           </div>
 
-          {/* Filter by Type */}
-          <Select value={filterType} onValueChange={setFilterType}>
+          <Select value={filterType} onValueChange={setFilterType} disabled={loading && submissions.length === 0}>
             <SelectTrigger className="w-full md:w-48">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="Contact">Contact</SelectItem>
-              <SelectItem value="Consultation">Consultation</SelectItem>
-              <SelectItem value="Community">Community</SelectItem>
-              <SelectItem value="Newsletter">Newsletter</SelectItem>
+              {submissionTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
-          {/* Export Button */}
-          <Button onClick={handleExportCSV} variant="outline">
+          <Button onClick={handleExportCSV} variant="outline" disabled={filteredSubmissions.length === 0}>
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </Button>
         </div>
       </Card>
 
-      {/* Results Count */}
-      <div className="text-sm text-muted-foreground">
-        Showing {filteredSubmissions.length} of {mockSubmissions.length} submissions
-      </div>
+      <div className="text-sm text-muted-foreground">{resultsSummary}</div>
 
-      {/* Table */}
+      {error ? (
+        <Card className="border-destructive/20 bg-destructive/10 text-destructive-foreground p-4">
+          {error}
+        </Card>
+      ) : null}
+
       <Card className="border-border bg-card">
         <Table>
           <TableHeader>
@@ -166,16 +215,29 @@ export default function FormsPage() {
               <TableHead className="text-muted-foreground">Name</TableHead>
               <TableHead className="text-muted-foreground">Email</TableHead>
               <TableHead className="text-muted-foreground">Phone</TableHead>
-              <TableHead className="text-muted-foreground">Message</TableHead>
+              <TableHead className="text-muted-foreground">Company</TableHead>
+              <TableHead className="text-muted-foreground">Details</TableHead>
               <TableHead className="text-muted-foreground">Source</TableHead>
               <TableHead className="text-muted-foreground">Type</TableHead>
-              <TableHead className="text-muted-foreground">Date</TableHead>
+              <TableHead className="text-muted-foreground">Submitted</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSubmissions.length === 0 ? (
+            {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  Loading submissions...
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  {"There was a problem loading submissions."}
+                </TableCell>
+              </TableRow>
+            ) : filteredSubmissions.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No submissions found
                 </TableCell>
               </TableRow>
@@ -184,14 +246,17 @@ export default function FormsPage() {
                 <TableRow key={submission.id} className="border-border hover:bg-muted/5">
                   <TableCell className="font-medium text-foreground">{submission.name}</TableCell>
                   <TableCell className="text-foreground">{submission.email}</TableCell>
-                  <TableCell className="text-foreground">{submission.phone}</TableCell>
-                  <TableCell className="max-w-xs truncate text-foreground">{submission.message}</TableCell>
+                  <TableCell className="text-foreground">{submission.phone ?? "—"}</TableCell>
+                  <TableCell className="text-foreground">{submission.company ?? "—"}</TableCell>
+                  <TableCell className="max-w-md truncate text-foreground">
+                    {submission.details ?? "—"}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{submission.source}</TableCell>
                   <TableCell>
                     <Badge className={getTypeBadgeColor(submission.type)}>{submission.type}</Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {new Date(submission.date).toLocaleDateString()}
+                    {new Date(submission.createdAt).toLocaleString()}
                   </TableCell>
                 </TableRow>
               ))
