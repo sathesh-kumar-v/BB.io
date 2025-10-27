@@ -293,6 +293,38 @@ export async function fetchFormSubmissions(): Promise<FormSubmission[]> {
   })
 }
 
+
+export async function fetchFooterLeads(): Promise<StoredFooterLead[]> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+
+  const result = await pool.query<FooterLeadRow>(
+    `
+      SELECT
+        id,
+        name,
+        email,
+        company_name,
+        industry,
+        preferred_call_time,
+        created_at
+      FROM footer_leads
+      ORDER BY created_at DESC
+    `,
+  )
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    companyName: row.company_name,
+    industry: row.industry,
+    preferredCallTime: row.preferred_call_time,
+    createdAt: toIsoTimestamp(row.created_at),
+  }))
+}
+
 export async function storeFooterLead(payload: FooterLeadPayload): Promise<StoredFooterLead> {
   await ensureLeadTables()
 

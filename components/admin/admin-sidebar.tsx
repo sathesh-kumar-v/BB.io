@@ -3,12 +3,13 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, FileText, Calendar, Users, Mail, FolderOpen, UserCog, Settings } from "lucide-react"
+import { LayoutDashboard, FileText, Calendar, Users, Mail, FolderOpen, UserCog, Settings, PhoneCall } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navigation = [
   { name: "Overview", href: "/admin", icon: LayoutDashboard },
   { name: "Form Submissions", href: "/admin/forms", icon: FileText },
+  { name: "Footer Leads", href: "/admin/footer-leads", icon: PhoneCall },
   { name: "Consultations", href: "/admin/consultations", icon: Calendar },
   { name: "Community", href: "/admin/community", icon: Users },
   { name: "Newsletter", href: "/admin/newsletter", icon: Mail },
