@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail } from "@/lib/email"
-import { storeFooterLead, type FooterLeadPayload } from "@/lib/storage"
+import { fetchFooterLeads, storeFooterLead, type FooterLeadPayload } from "@/lib/storage"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -13,6 +13,18 @@ const footerLeadSchema = z.object({
   industry: z.string().min(1),
   preferredCallTime: z.string().min(1),
 })
+
+
+export async function GET() {
+  try {
+    const leads = await fetchFooterLeads()
+
+    return NextResponse.json({ leads })
+  } catch (error) {
+    console.error("Failed to load footer leads", error)
+    return NextResponse.json({ error: "Unable to load footer leads" }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
