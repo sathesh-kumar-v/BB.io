@@ -151,6 +151,85 @@ async function ensureTables(client: PoolClient) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS hero_leads (
+      id UUID PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      company TEXT NOT NULL,
+      phone TEXT,
+      project_focus TEXT NOT NULL,
+      goals TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS quick_sessions (
+      id UUID PRIMARY KEY,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      company TEXT NOT NULL,
+      industry TEXT NOT NULL,
+      biggest_challenge TEXT NOT NULL,
+      meeting_format TEXT NOT NULL,
+      preferred_time TEXT NOT NULL,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS community_applications (
+      id UUID PRIMARY KEY,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      company TEXT NOT NULL,
+      industry TEXT NOT NULL,
+      team_size TEXT NOT NULL,
+      challenge TEXT NOT NULL,
+      has_automation TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      referral TEXT,
+      linkedin TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS ai_readiness_assessments (
+      id UUID PRIMARY KEY,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      company TEXT NOT NULL,
+      role TEXT NOT NULL,
+      team_size TEXT NOT NULL,
+      current_systems TEXT NOT NULL,
+      data_sources TEXT NOT NULL,
+      ai_experience TEXT[] NOT NULL,
+      top_goals TEXT NOT NULL,
+      success_metrics TEXT NOT NULL,
+      timeline TEXT NOT NULL,
+      budget_range TEXT NOT NULL,
+      compliance_needs TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id UUID PRIMARY KEY,
+      email TEXT NOT NULL,
+      subscription_type TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
 }
 
 async function ensureTablesWithClient(attempt = 0): Promise<void> {

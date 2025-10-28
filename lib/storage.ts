@@ -37,6 +37,65 @@ export type FooterLeadPayload = {
   preferredCallTime: string
 }
 
+export type HeroLeadPayload = {
+  name: string
+  email: string
+  company: string
+  phone?: string
+  projectFocus: string
+  goals?: string
+}
+
+export type QuickSessionPayload = {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  company: string
+  industry: string
+  biggestChallenge: string
+  meetingFormat: "video" | "phone"
+  preferredTime: string
+  notes?: string
+}
+
+export type CommunityApplicationPayload = {
+  firstName: string
+  lastName: string
+  email: string
+  company: string
+  industry: string
+  teamSize: string
+  challenge: string
+  hasAutomation: string
+  outcome: string
+  referral?: string
+  linkedin?: string
+}
+
+export type AiReadinessPayload = {
+  firstName: string
+  lastName: string
+  email: string
+  company: string
+  role: string
+  teamSize: string
+  currentSystems: string
+  dataSources: string
+  aiExperience: string[]
+  topGoals: string
+  successMetrics: string
+  timeline: string
+  budgetRange: string
+  complianceNeeds?: string
+  notes?: string
+}
+
+export type SubscriptionPayload = {
+  email: string
+  type: "newsletter" | "community"
+}
+
 export type StoredConsultation = ConsultationPayload & {
   id: string
   createdAt: string
@@ -47,9 +106,42 @@ export type StoredFooterLead = FooterLeadPayload & {
   createdAt: string
 }
 
+export type StoredHeroLead = HeroLeadPayload & {
+  id: string
+  createdAt: string
+}
+
+export type StoredQuickSession = QuickSessionPayload & {
+  id: string
+  createdAt: string
+}
+
+export type StoredCommunityApplication = CommunityApplicationPayload & {
+  id: string
+  createdAt: string
+}
+
+export type StoredAiReadinessAssessment = AiReadinessPayload & {
+  id: string
+  createdAt: string
+}
+
+export type StoredSubscription = SubscriptionPayload & {
+  id: string
+  createdAt: string
+}
+
 export type FormSubmission = {
   id: string
-  type: "Consultation" | "Footer Lead"
+  type:
+    | "Consultation"
+    | "Footer Lead"
+    | "Hero Lead"
+    | "Quick Session"
+    | "Community Application"
+    | "AI Readiness Assessment"
+    | "Newsletter Subscription"
+    | "Community Waitlist"
   name: string
   email: string
   phone?: string | null
@@ -202,9 +294,90 @@ type FooterLeadRow = {
   created_at: string
 }
 
+type HeroLeadRow = {
+  id: string
+  name: string
+  email: string
+  company: string
+  phone: string | null
+  project_focus: string
+  goals: string | null
+  created_at: string
+}
+
+type QuickSessionRow = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  company: string
+  industry: string
+  biggest_challenge: string
+  meeting_format: string
+  preferred_time: string
+  notes: string | null
+  created_at: string
+}
+
+type CommunityApplicationRow = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  company: string
+  industry: string
+  team_size: string
+  challenge: string
+  has_automation: string
+  outcome: string
+  referral: string | null
+  linkedin: string | null
+  created_at: string
+}
+
+type AiReadinessRow = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  company: string
+  role: string
+  team_size: string
+  current_systems: string
+  data_sources: string
+  ai_experience: string[]
+  top_goals: string
+  success_metrics: string
+  timeline: string
+  budget_range: string
+  compliance_needs: string | null
+  notes: string | null
+  created_at: string
+}
+
+type SubscriptionRow = {
+  id: string
+  email: string
+  subscription_type: string
+  created_at: string
+}
+
 function normalizeString(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
+}
+
+function joinDetails(parts: Array<string | null | undefined>): string | undefined {
+  const filtered = parts
+    .map((part) => normalizeString(part ?? undefined))
+    .filter((part): part is string => Boolean(part))
+
+  if (filtered.length === 0) {
+    return undefined
+  }
+
+  return filtered.join(" • ")
 }
 
 export async function fetchFormSubmissions(): Promise<FormSubmission[]> {
@@ -212,7 +385,15 @@ export async function fetchFormSubmissions(): Promise<FormSubmission[]> {
 
   const pool = getPool()
 
-  const [consultationResult, footerLeadResult] = await Promise.all([
+  const [
+    consultationResult,
+    footerLeadResult,
+    heroLeadResult,
+    quickSessionResult,
+    communityApplicationsResult,
+    aiReadinessResult,
+    subscriptionResult,
+  ] = await Promise.all([
     pool.query<ConsultationRow>(
       `
         SELECT
@@ -240,6 +421,90 @@ export async function fetchFormSubmissions(): Promise<FormSubmission[]> {
           preferred_call_time,
           created_at
         FROM footer_leads
+      `,
+    ),
+    pool.query<HeroLeadRow>(
+      `
+        SELECT
+          id,
+          name,
+          email,
+          company,
+          phone,
+          project_focus,
+          goals,
+          created_at
+        FROM hero_leads
+      `,
+    ),
+    pool.query<QuickSessionRow>(
+      `
+        SELECT
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          company,
+          industry,
+          biggest_challenge,
+          meeting_format,
+          preferred_time,
+          notes,
+          created_at
+        FROM quick_sessions
+      `,
+    ),
+    pool.query<CommunityApplicationRow>(
+      `
+        SELECT
+          id,
+          first_name,
+          last_name,
+          email,
+          company,
+          industry,
+          team_size,
+          challenge,
+          has_automation,
+          outcome,
+          referral,
+          linkedin,
+          created_at
+        FROM community_applications
+      `,
+    ),
+    pool.query<AiReadinessRow>(
+      `
+        SELECT
+          id,
+          first_name,
+          last_name,
+          email,
+          company,
+          role,
+          team_size,
+          current_systems,
+          data_sources,
+          ai_experience,
+          top_goals,
+          success_metrics,
+          timeline,
+          budget_range,
+          compliance_needs,
+          notes,
+          created_at
+        FROM ai_readiness_assessments
+      `,
+    ),
+    pool.query<SubscriptionRow>(
+      `
+        SELECT
+          id,
+          email,
+          subscription_type,
+          created_at
+        FROM subscriptions
       `,
     ),
   ])
@@ -288,7 +553,135 @@ export async function fetchFormSubmissions(): Promise<FormSubmission[]> {
     }
   })
 
-  return [...consultationSubmissions, ...footerLeadSubmissions].sort((a, b) => {
+  const heroLeadSubmissions: FormSubmission[] = heroLeadResult.rows.map((row) => {
+    const createdAt = toIsoTimestamp(row.created_at)
+    const phone = normalizeString(row.phone ?? undefined)
+    const company = normalizeString(row.company)
+    const name = normalizeString(row.name) ?? row.name
+    const details = joinDetails([
+      `Project focus: ${row.project_focus}`,
+      row.goals ? `Goals: ${row.goals}` : null,
+    ])
+
+    return {
+      id: row.id,
+      type: "Hero Lead",
+      name,
+      email: row.email,
+      phone: phone ?? undefined,
+      company: company ?? undefined,
+      details,
+      source: "Hero Contact Form",
+      createdAt,
+    }
+  })
+
+  const quickSessionSubmissions: FormSubmission[] = quickSessionResult.rows.map((row) => {
+    const createdAt = toIsoTimestamp(row.created_at)
+    const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+    const formattedMeeting = normalizeString(row.meeting_format)?.toLowerCase() === "phone" ? "Phone" : "Video"
+    const details = joinDetails([
+      `Challenge: ${row.biggest_challenge}`,
+      formattedMeeting ? `Format: ${formattedMeeting}` : null,
+      `Preferred time: ${row.preferred_time}`,
+      row.notes ? `Notes: ${row.notes}` : null,
+    ])
+
+    return {
+      id: row.id,
+      type: "Quick Session",
+      name: fullName || row.first_name || row.last_name,
+      email: row.email,
+      phone: normalizeString(row.phone) ?? undefined,
+      company: normalizeString(row.company) ?? undefined,
+      details,
+      source: "Quick Session Form",
+      createdAt,
+    }
+  })
+
+  const communitySubmissions: FormSubmission[] = communityApplicationsResult.rows.map((row) => {
+    const createdAt = toIsoTimestamp(row.created_at)
+    const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+    const details = joinDetails([
+      `Industry: ${row.industry}`,
+      `Team size: ${row.team_size}`,
+      `Challenge: ${row.challenge}`,
+      `Current automation: ${row.has_automation}`,
+      `Desired outcome: ${row.outcome}`,
+      row.referral ? `Referral: ${row.referral}` : null,
+      row.linkedin ? `LinkedIn: ${row.linkedin}` : null,
+    ])
+
+    return {
+      id: row.id,
+      type: "Community Application",
+      name: fullName || row.first_name || row.last_name,
+      email: row.email,
+      company: normalizeString(row.company) ?? undefined,
+      details,
+      source: "Community Application Form",
+      createdAt,
+    }
+  })
+
+  const aiReadinessSubmissions: FormSubmission[] = aiReadinessResult.rows.map((row) => {
+    const createdAt = toIsoTimestamp(row.created_at)
+    const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+    const aiExperience = Array.isArray(row.ai_experience) && row.ai_experience.length > 0 ? row.ai_experience.join(", ") : null
+    const details = joinDetails([
+      `Role: ${row.role}`,
+      `Team size: ${row.team_size}`,
+      `Systems: ${row.current_systems}`,
+      `Data sources: ${row.data_sources}`,
+      aiExperience ? `AI experience: ${aiExperience}` : null,
+      `Goals: ${row.top_goals}`,
+      `Success metrics: ${row.success_metrics}`,
+      `Timeline: ${row.timeline}`,
+      `Budget: ${row.budget_range}`,
+      row.compliance_needs ? `Compliance needs: ${row.compliance_needs}` : null,
+      row.notes ? `Notes: ${row.notes}` : null,
+    ])
+
+    return {
+      id: row.id,
+      type: "AI Readiness Assessment",
+      name: fullName || row.first_name || row.last_name,
+      email: row.email,
+      company: normalizeString(row.company) ?? undefined,
+      details,
+      source: "AI Readiness Assessment",
+      createdAt,
+    }
+  })
+
+  const subscriptionSubmissions: FormSubmission[] = subscriptionResult.rows.map((row) => {
+    const createdAt = toIsoTimestamp(row.created_at)
+    const normalizedType = normalizeString(row.subscription_type)?.toLowerCase()
+    const isCommunity = normalizedType === "community"
+    const typeLabel = isCommunity ? "Community Waitlist" : "Newsletter Subscription"
+    const source = isCommunity ? "Community Waitlist Form" : "Newsletter Signup Form"
+
+    return {
+      id: row.id,
+      type: typeLabel,
+      name: row.email,
+      email: row.email,
+      details: joinDetails([`Type: ${typeLabel}`]),
+      source,
+      createdAt,
+    }
+  })
+
+  return [
+    ...consultationSubmissions,
+    ...footerLeadSubmissions,
+    ...heroLeadSubmissions,
+    ...quickSessionSubmissions,
+    ...communitySubmissions,
+    ...aiReadinessSubmissions,
+    ...subscriptionSubmissions,
+  ].sort((a, b) => {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
 }
@@ -352,6 +745,251 @@ export async function storeFooterLead(payload: FooterLeadPayload): Promise<Store
       payload.industry,
       payload.preferredCallTime,
     ],
+  )
+
+  const createdAt = toIsoTimestamp(result.rows[0]?.created_at)
+
+  return {
+    ...payload,
+    id,
+    createdAt,
+  }
+}
+
+export async function storeHeroLead(payload: HeroLeadPayload): Promise<StoredHeroLead> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+  const id = randomUUID()
+
+  const result = await pool.query<{ created_at: string }>(
+    `
+      INSERT INTO hero_leads (
+        id,
+        name,
+        email,
+        company,
+        phone,
+        project_focus,
+        goals
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING created_at
+    `,
+    [
+      id,
+      payload.name,
+      payload.email,
+      payload.company,
+      payload.phone ?? null,
+      payload.projectFocus,
+      payload.goals ?? null,
+    ],
+  )
+
+  const createdAt = toIsoTimestamp(result.rows[0]?.created_at)
+
+  return {
+    ...payload,
+    id,
+    createdAt,
+  }
+}
+
+export async function storeQuickSession(payload: QuickSessionPayload): Promise<StoredQuickSession> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+  const id = randomUUID()
+
+  const result = await pool.query<{ created_at: string }>(
+    `
+      INSERT INTO quick_sessions (
+        id,
+        first_name,
+        last_name,
+        email,
+        phone,
+        company,
+        industry,
+        biggest_challenge,
+        meeting_format,
+        preferred_time,
+        notes
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING created_at
+    `,
+    [
+      id,
+      payload.firstName,
+      payload.lastName,
+      payload.email,
+      payload.phone,
+      payload.company,
+      payload.industry,
+      payload.biggestChallenge,
+      payload.meetingFormat,
+      payload.preferredTime,
+      payload.notes ?? null,
+    ],
+  )
+
+  const createdAt = toIsoTimestamp(result.rows[0]?.created_at)
+
+  return {
+    ...payload,
+    id,
+    createdAt,
+  }
+}
+
+export async function storeCommunityApplication(
+  payload: CommunityApplicationPayload,
+): Promise<StoredCommunityApplication> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+  const id = randomUUID()
+
+  const result = await pool.query<{ created_at: string }>(
+    `
+      INSERT INTO community_applications (
+        id,
+        first_name,
+        last_name,
+        email,
+        company,
+        industry,
+        team_size,
+        challenge,
+        has_automation,
+        outcome,
+        referral,
+        linkedin
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING created_at
+    `,
+    [
+      id,
+      payload.firstName,
+      payload.lastName,
+      payload.email,
+      payload.company,
+      payload.industry,
+      payload.teamSize,
+      payload.challenge,
+      payload.hasAutomation,
+      payload.outcome,
+      payload.referral ?? null,
+      payload.linkedin ?? null,
+    ],
+  )
+
+  const createdAt = toIsoTimestamp(result.rows[0]?.created_at)
+
+  return {
+    ...payload,
+    id,
+    createdAt,
+  }
+}
+
+export async function storeAiReadinessAssessment(
+  payload: AiReadinessPayload,
+): Promise<StoredAiReadinessAssessment> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+  const id = randomUUID()
+
+  const result = await pool.query<{ created_at: string }>(
+    `
+      INSERT INTO ai_readiness_assessments (
+        id,
+        first_name,
+        last_name,
+        email,
+        company,
+        role,
+        team_size,
+        current_systems,
+        data_sources,
+        ai_experience,
+        top_goals,
+        success_metrics,
+        timeline,
+        budget_range,
+        compliance_needs,
+        notes
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12,
+        $13,
+        $14,
+        $15,
+        $16
+      )
+      RETURNING created_at
+    `,
+    [
+      id,
+      payload.firstName,
+      payload.lastName,
+      payload.email,
+      payload.company,
+      payload.role,
+      payload.teamSize,
+      payload.currentSystems,
+      payload.dataSources,
+      payload.aiExperience,
+      payload.topGoals,
+      payload.successMetrics,
+      payload.timeline,
+      payload.budgetRange,
+      payload.complianceNeeds ?? null,
+      payload.notes ?? null,
+    ],
+  )
+
+  const createdAt = toIsoTimestamp(result.rows[0]?.created_at)
+
+  return {
+    ...payload,
+    id,
+    createdAt,
+  }
+}
+
+export async function storeSubscription(payload: SubscriptionPayload): Promise<StoredSubscription> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+  const id = randomUUID()
+
+  const result = await pool.query<{ created_at: string }>(
+    `
+      INSERT INTO subscriptions (
+        id,
+        email,
+        subscription_type
+      )
+      VALUES ($1, $2, $3)
+      RETURNING created_at
+    `,
+    [id, payload.email, payload.type],
   )
 
   const createdAt = toIsoTimestamp(result.rows[0]?.created_at)

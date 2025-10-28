@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail, sendNotificationEmail } from "@/lib/email"
+import { storeQuickSession, type QuickSessionPayload } from "@/lib/storage"
 
 const sessionSchema = z.object({
   firstName: z.string().min(1),
@@ -21,31 +22,37 @@ export const dynamic = "force-dynamic"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const payload = sessionSchema.parse(body)
+    const payload = sessionSchema.parse(body) as QuickSessionPayload
 
-    await Promise.all([
-      sendConfirmationEmail({
-        to: payload.email,
-        name: `${payload.firstName} ${payload.lastName}`.trim(),
-        template: "quick-session",
-      }),
-      sendNotificationEmail({
-        subject: "New quick session request",
-        details: [
-          { label: "Name", value: `${payload.firstName} ${payload.lastName}`.trim() },
-          { label: "Email", value: payload.email },
-          { label: "Phone", value: payload.phone },
-          { label: "Company", value: payload.company },
-          { label: "Industry", value: payload.industry },
-          { label: "Challenge", value: payload.biggestChallenge },
-          { label: "Meeting format", value: payload.meetingFormat === "video" ? "Video" : "Phone" },
-          { label: "Preferred time", value: payload.preferredTime },
-          payload.notes ? { label: "Additional notes", value: payload.notes } : null,
-        ].filter(Boolean) as { label: string; value: string }[],
-      }),
-    ])
+    const storedSession = await storeQuickSession(payload)
 
-    return NextResponse.json({ success: true })
+    try {
+      await Promise.all([
+        sendConfirmationEmail({
+          to: payload.email,
+          name: `${payload.firstName} ${payload.lastName}`.trim(),
+          template: "quick-session",
+        }),
+        sendNotificationEmail({
+          subject: "New quick session request",
+          details: [
+            { label: "Name", value: `${payload.firstName} ${payload.lastName}`.trim() },
+            { label: "Email", value: payload.email },
+            { label: "Phone", value: payload.phone },
+            { label: "Company", value: payload.company },
+            { label: "Industry", value: payload.industry },
+            { label: "Challenge", value: payload.biggestChallenge },
+            { label: "Meeting format", value: payload.meetingFormat === "video" ? "Video" : "Phone" },
+            { label: "Preferred time", value: payload.preferredTime },
+            payload.notes ? { label: "Additional notes", value: payload.notes } : null,
+          ].filter(Boolean) as { label: string; value: string }[],
+        }),
+      ])
+    } catch (emailError) {
+      console.error("Quick session email delivery failed", emailError)
+    }
+
+    return NextResponse.json({ success: true, id: storedSession.id }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid session request", details: error.flatten() }, { status: 400 })
