@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail, sendNotificationEmail } from "@/lib/email"
+import { storeHeroLead, type HeroLeadPayload } from "@/lib/storage"
 
 const heroLeadSchema = z.object({
   name: z.string().min(1),
@@ -17,28 +18,34 @@ export const dynamic = "force-dynamic"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const payload = heroLeadSchema.parse(body)
+    const payload = heroLeadSchema.parse(body) as HeroLeadPayload
 
-    await Promise.all([
-      sendConfirmationEmail({
-        to: payload.email,
-        name: payload.name,
-        template: "hero-lead",
-      }),
-      sendNotificationEmail({
-        subject: "New hero lead captured",
-        details: [
-          { label: "Name", value: payload.name },
-          { label: "Email", value: payload.email },
-          { label: "Company", value: payload.company },
-          payload.phone ? { label: "Phone", value: payload.phone } : null,
-          { label: "Project focus", value: payload.projectFocus },
-          payload.goals ? { label: "Goals", value: payload.goals } : null,
-        ].filter(Boolean) as { label: string; value: string }[],
-      }),
-    ])
+    const storedLead = await storeHeroLead(payload)
 
-    return NextResponse.json({ success: true })
+    try {
+      await Promise.all([
+        sendConfirmationEmail({
+          to: payload.email,
+          name: payload.name,
+          template: "hero-lead",
+        }),
+        sendNotificationEmail({
+          subject: "New hero lead captured",
+          details: [
+            { label: "Name", value: payload.name },
+            { label: "Email", value: payload.email },
+            { label: "Company", value: payload.company },
+            payload.phone ? { label: "Phone", value: payload.phone } : null,
+            { label: "Project focus", value: payload.projectFocus },
+            payload.goals ? { label: "Goals", value: payload.goals } : null,
+          ].filter(Boolean) as { label: string; value: string }[],
+        }),
+      ])
+    } catch (emailError) {
+      console.error("Hero lead email delivery failed", emailError)
+    }
+
+    return NextResponse.json({ success: true, id: storedLead.id }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid submission", details: error.flatten() }, { status: 400 })

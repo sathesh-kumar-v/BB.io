@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail, sendNotificationEmail } from "@/lib/email"
+import { storeSubscription, type SubscriptionPayload } from "@/lib/storage"
 
 const subscriptionSchema = z.discriminatedUnion("type", [
   z.object({
@@ -19,23 +20,29 @@ export const dynamic = "force-dynamic"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const payload = subscriptionSchema.parse(body)
+    const payload = subscriptionSchema.parse(body) as SubscriptionPayload
+
+    const storedSubscription = await storeSubscription(payload)
 
     const template = payload.type === "newsletter" ? "newsletter-signup" : "community-signup"
     const subject = payload.type === "newsletter" ? "New newsletter subscriber" : "New community waitlist subscriber"
 
-    await Promise.all([
-      sendConfirmationEmail({ to: payload.email, template, name: "" }),
-      sendNotificationEmail({
-        subject,
-        details: [
-          { label: "Type", value: payload.type === "newsletter" ? "Newsletter" : "Community" },
-          { label: "Email", value: payload.email },
-        ],
-      }),
-    ])
+    try {
+      await Promise.all([
+        sendConfirmationEmail({ to: payload.email, template, name: "" }),
+        sendNotificationEmail({
+          subject,
+          details: [
+            { label: "Type", value: payload.type === "newsletter" ? "Newsletter" : "Community" },
+            { label: "Email", value: payload.email },
+          ],
+        }),
+      ])
+    } catch (emailError) {
+      console.error("Subscription email delivery failed", emailError)
+    }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, id: storedSubscription.id }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid subscription", details: error.flatten() }, { status: 400 })

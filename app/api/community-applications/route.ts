@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail, sendNotificationEmail } from "@/lib/email"
+import { storeCommunityApplication, type CommunityApplicationPayload } from "@/lib/storage"
 
 const applicationSchema = z.object({
   firstName: z.string().min(1),
@@ -22,32 +23,38 @@ export const dynamic = "force-dynamic"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const payload = applicationSchema.parse(body)
+    const payload = applicationSchema.parse(body) as CommunityApplicationPayload
 
-    await Promise.all([
-      sendConfirmationEmail({
-        to: payload.email,
-        name: `${payload.firstName} ${payload.lastName}`.trim(),
-        template: "community-signup",
-      }),
-      sendNotificationEmail({
-        subject: "New community application",
-        details: [
-          { label: "Name", value: `${payload.firstName} ${payload.lastName}`.trim() },
-          { label: "Email", value: payload.email },
-          { label: "Company", value: payload.company },
-          { label: "Industry", value: payload.industry },
-          { label: "Team size", value: payload.teamSize },
-          { label: "Biggest challenge", value: payload.challenge },
-          { label: "Current automation", value: payload.hasAutomation },
-          { label: "Desired outcome", value: payload.outcome },
-          payload.referral ? { label: "Referral", value: payload.referral } : null,
-          payload.linkedin ? { label: "LinkedIn", value: payload.linkedin } : null,
-        ].filter(Boolean) as { label: string; value: string }[],
-      }),
-    ])
+    const storedApplication = await storeCommunityApplication(payload)
 
-    return NextResponse.json({ success: true })
+    try {
+      await Promise.all([
+        sendConfirmationEmail({
+          to: payload.email,
+          name: `${payload.firstName} ${payload.lastName}`.trim(),
+          template: "community-signup",
+        }),
+        sendNotificationEmail({
+          subject: "New community application",
+          details: [
+            { label: "Name", value: `${payload.firstName} ${payload.lastName}`.trim() },
+            { label: "Email", value: payload.email },
+            { label: "Company", value: payload.company },
+            { label: "Industry", value: payload.industry },
+            { label: "Team size", value: payload.teamSize },
+            { label: "Biggest challenge", value: payload.challenge },
+            { label: "Current automation", value: payload.hasAutomation },
+            { label: "Desired outcome", value: payload.outcome },
+            payload.referral ? { label: "Referral", value: payload.referral } : null,
+            payload.linkedin ? { label: "LinkedIn", value: payload.linkedin } : null,
+          ].filter(Boolean) as { label: string; value: string }[],
+        }),
+      ])
+    } catch (emailError) {
+      console.error("Community application email delivery failed", emailError)
+    }
+
+    return NextResponse.json({ success: true, id: storedApplication.id }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid community application", details: error.flatten() }, { status: 400 })

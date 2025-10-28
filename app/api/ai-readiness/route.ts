@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail, sendNotificationEmail } from "@/lib/email"
+import { storeAiReadinessAssessment, type AiReadinessPayload } from "@/lib/storage"
 
 const readinessSchema = z.object({
   firstName: z.string().min(1),
@@ -26,36 +27,42 @@ export const dynamic = "force-dynamic"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const payload = readinessSchema.parse(body)
+    const payload = readinessSchema.parse(body) as AiReadinessPayload
 
-    await Promise.all([
-      sendConfirmationEmail({
-        to: payload.email,
-        name: `${payload.firstName} ${payload.lastName}`.trim(),
-        template: "ai-readiness",
-      }),
-      sendNotificationEmail({
-        subject: "New AI readiness assessment",
-        details: [
-          { label: "Name", value: `${payload.firstName} ${payload.lastName}`.trim() },
-          { label: "Email", value: payload.email },
-          { label: "Company", value: payload.company },
-          { label: "Role", value: payload.role },
-          { label: "Team size", value: payload.teamSize },
-          { label: "Systems", value: payload.currentSystems },
-          { label: "Data sources", value: payload.dataSources },
-          { label: "AI experience", value: payload.aiExperience.join(", ") },
-          { label: "Top goals", value: payload.topGoals },
-          { label: "Success metrics", value: payload.successMetrics },
-          { label: "Timeline", value: payload.timeline },
-          { label: "Budget", value: payload.budgetRange },
-          payload.complianceNeeds ? { label: "Compliance needs", value: payload.complianceNeeds } : null,
-          payload.notes ? { label: "Additional notes", value: payload.notes } : null,
-        ].filter(Boolean) as { label: string; value: string }[],
-      }),
-    ])
+    const storedAssessment = await storeAiReadinessAssessment(payload)
 
-    return NextResponse.json({ success: true })
+    try {
+      await Promise.all([
+        sendConfirmationEmail({
+          to: payload.email,
+          name: `${payload.firstName} ${payload.lastName}`.trim(),
+          template: "ai-readiness",
+        }),
+        sendNotificationEmail({
+          subject: "New AI readiness assessment",
+          details: [
+            { label: "Name", value: `${payload.firstName} ${payload.lastName}`.trim() },
+            { label: "Email", value: payload.email },
+            { label: "Company", value: payload.company },
+            { label: "Role", value: payload.role },
+            { label: "Team size", value: payload.teamSize },
+            { label: "Systems", value: payload.currentSystems },
+            { label: "Data sources", value: payload.dataSources },
+            { label: "AI experience", value: payload.aiExperience.join(", ") },
+            { label: "Top goals", value: payload.topGoals },
+            { label: "Success metrics", value: payload.successMetrics },
+            { label: "Timeline", value: payload.timeline },
+            { label: "Budget", value: payload.budgetRange },
+            payload.complianceNeeds ? { label: "Compliance needs", value: payload.complianceNeeds } : null,
+            payload.notes ? { label: "Additional notes", value: payload.notes } : null,
+          ].filter(Boolean) as { label: string; value: string }[],
+        }),
+      ])
+    } catch (emailError) {
+      console.error("AI readiness email delivery failed", emailError)
+    }
+
+    return NextResponse.json({ success: true, id: storedAssessment.id }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid assessment", details: error.flatten() }, { status: 400 })
