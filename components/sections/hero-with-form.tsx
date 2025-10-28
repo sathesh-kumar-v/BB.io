@@ -1,7 +1,7 @@
 "use client"
 
 import { Building2, Scale, TrendingUp } from "lucide-react"
-import { MultiStepConsultationForm } from "@/components/forms/multi-step-consultation-form"
+import { HeroContactForm } from "@/components/forms/hero-contact-form"
 
 export function HeroWithForm() {
   return (
@@ -80,7 +80,7 @@ export function HeroWithForm() {
                 See exactly how AI can transform your property or legal business
               </p>
 
-              <MultiStepConsultationForm />
+              <HeroContactForm />
             </div>
           </div>
         </div>

@@ -36,6 +36,8 @@ export function Navigation() {
     },
   ]
 
+  const closeServices = () => setIsServicesOpen(false)
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
@@ -50,22 +52,34 @@ export function Navigation() {
             <div
               className="relative"
               onMouseEnter={() => setIsServicesOpen(true)}
-              onMouseLeave={() => setIsServicesOpen(false)}
+              onMouseLeave={closeServices}
+              onFocus={() => setIsServicesOpen(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  closeServices()
+                }
+              }}
             >
-              <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors">
+              <button
+                type="button"
+                aria-haspopup="true"
+                aria-expanded={isServicesOpen}
+                className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors focus-visible:text-foreground"
+              >
                 Services
                 <ChevronDown size={16} className={`transition-transform ${isServicesOpen ? "rotate-180" : ""}`} />
               </button>
 
               {/* Services Dropdown */}
               {isServicesOpen && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[600px] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-full left-0 mt-2 w-[560px] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="p-2 grid grid-cols-2 gap-2">
                     {services.map((service) => (
                       <Link
                         key={service.href}
                         href={service.href}
-                        className="group p-4 rounded-lg hover:bg-accent transition-colors"
+                        className="group p-4 rounded-lg hover:bg-accent transition-colors focus-visible:outline-none"
+                        onClick={closeServices}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors text-sm">

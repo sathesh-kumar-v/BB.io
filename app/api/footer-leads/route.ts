@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { sendConfirmationEmail } from "@/lib/email"
+import { sendConfirmationEmail, sendNotificationEmail } from "@/lib/email"
 import { fetchFooterLeads, storeFooterLead, type FooterLeadPayload } from "@/lib/storage"
 
 export const runtime = "nodejs"
@@ -34,11 +34,23 @@ export async function POST(request: NextRequest) {
     const storedRecord = await storeFooterLead(payload)
 
     try {
-      await sendConfirmationEmail({
-        to: payload.email,
-        name: payload.name,
-        template: "footer-lead",
-      })
+      await Promise.all([
+        sendConfirmationEmail({
+          to: payload.email,
+          name: payload.name,
+          template: "footer-lead",
+        }),
+        sendNotificationEmail({
+          subject: "New quick call request",
+          details: [
+            { label: "Name", value: payload.name },
+            { label: "Email", value: payload.email },
+            { label: "Company", value: payload.companyName },
+            { label: "Industry", value: payload.industry },
+            { label: "Preferred time", value: payload.preferredCallTime },
+          ],
+        }),
+      ])
     } catch (emailError) {
       console.error("Footer confirmation email failed", emailError)
     }

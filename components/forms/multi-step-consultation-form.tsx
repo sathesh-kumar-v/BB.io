@@ -616,8 +616,8 @@ export function MultiStepConsultationForm() {
           <div className="text-[#71717a] text-xs">Satisfaction</div>
         </div>
         <div className="text-center flex-1 border-l border-[#262626]">
-          <div className="text-white font-semibold text-sm">HIPAA</div>
-          <div className="text-[#71717a] text-xs">Compliant</div>
+          <div className="text-white font-semibold text-sm">24h</div>
+          <div className="text-[#71717a] text-xs">Response time</div>
         </div>
       </div>
     </form>

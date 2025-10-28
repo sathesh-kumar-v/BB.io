@@ -13,6 +13,31 @@ const EMAIL_TEMPLATES = {
     intro:
       "We received your message and will be in touch soon with next steps tailored to your business goals.",
   },
+  "hero-lead": {
+    subject: "Thanks for sharing your AI priorities",
+    intro:
+      "Our team is reviewing your submission and will follow up with a short list of high-impact automation opportunities.",
+  },
+  "ai-readiness": {
+    subject: "Your AI readiness assessment is in progress",
+    intro:
+      "Thanks for the detailed context. We'll analyze your current stack and send back a readiness report with prioritized recommendations.",
+  },
+  "quick-session": {
+    subject: "We received your 1:1 session request",
+    intro:
+      "We'll share available times that match your preferences so you can jump into a focused strategy conversation.",
+  },
+  "newsletter-signup": {
+    subject: "You're on the AI intelligence list",
+    intro:
+      "Expect practical breakdowns, ROI analyses, and implementation playbooks direct to your inbox each week.",
+  },
+  "community-signup": {
+    subject: "Thanks for joining the AI Builders waitlist",
+    intro:
+      "We'll review your submission and follow up with next steps to unlock the private community and resource library.",
+  },
 } as const satisfies Record<string, { subject: string; intro: string }>
 
 type TemplateKey = keyof typeof EMAIL_TEMPLATES
@@ -52,6 +77,11 @@ export async function sendConfirmationEmail({ to, name, template }: SendEmailOpt
   }
 
   const selectedTemplate = EMAIL_TEMPLATES[template]
+
+  if (!selectedTemplate) {
+    console.warn("Unknown email template", template)
+    return
+  }
   const html = buildHtml(name?.trim() ?? "", selectedTemplate.intro)
 
   await sendEmailThroughSmtp({
@@ -62,6 +92,40 @@ export async function sendConfirmationEmail({ to, name, template }: SendEmailOpt
     from: fromAddress,
     to,
     subject: selectedTemplate.subject,
+    html,
+  })
+}
+
+type NotificationDetail = { label: string; value: string }
+
+type NotificationOptions = {
+  subject: string
+  details: NotificationDetail[]
+}
+
+export async function sendNotificationEmail({ subject, details }: NotificationOptions) {
+  const smtpUser = process.env.SMTP_USER
+  const smtpPassword = process.env.SMTP_PASSWORD
+  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com"
+  const smtpPort = Number(process.env.SMTP_PORT) || 465
+  const fromAddress = process.env.SMTP_FROM_EMAIL || smtpUser
+  const notifyAddress = process.env.SMTP_NOTIFICATION_EMAIL || fromAddress
+
+  if (!smtpUser || !smtpPassword || !fromAddress || !notifyAddress) {
+    console.warn("SMTP credentials are not fully configured. Skipping notification email for", subject)
+    return
+  }
+
+  const html = buildNotificationHtml(subject, details)
+
+  await sendEmailThroughSmtp({
+    host: smtpHost,
+    port: smtpPort,
+    user: smtpUser,
+    password: smtpPassword,
+    from: fromAddress,
+    to: notifyAddress,
+    subject,
     html,
   })
 }
@@ -189,6 +253,35 @@ function buildMimeMessage({ from, to, subject, html }: { from: string; to: strin
   ]
 
   return `${headers.join("\r\n")}\r\n\r\n${html}`
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function buildNotificationHtml(subject: string, details: NotificationDetail[]) {
+  const rows = details
+    .map((detail) => {
+      const safeLabel = escapeHtml(detail.label)
+      const safeValue = escapeHtml(detail.value)
+      return `<tr><td style="padding: 6px 12px; font-weight: 600; color: #f4f4f5;">${safeLabel}</td><td style="padding: 6px 12px; color: #d4d4d8;">${safeValue}</td></tr>`
+    })
+    .join("")
+
+  return `<!doctype html>
+<html>
+  <body style="font-family: Arial, sans-serif; background-color: #0a0a0a; color: #ffffff; padding: 32px;">
+    <div style="max-width: 520px; margin: 0 auto; background-color: #111111; border-radius: 16px; padding: 32px; border: 1px solid #262626;">
+      <h1 style="font-size: 22px; margin-bottom: 12px;">${escapeHtml(subject)}</h1>
+      <table style="width: 100%; border-collapse: collapse;">${rows}</table>
+    </div>
+  </body>
+</html>`
 }
 
 function extractEmailAddress(address: string) {
