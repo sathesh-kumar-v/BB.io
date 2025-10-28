@@ -1,4 +1,14 @@
 import { randomUUID } from "crypto"
+import { readFile } from "fs/promises"
+import path from "path"
+import {
+  FORM_SUBMISSION_TYPES,
+  createEmptySubmissionGroups,
+  type FormSubmission,
+  type FormSubmissionType,
+  type FormSubmissionsResponse,
+  type GroupedFormSubmissions,
+} from "@/types/forms"
 import { ensureLeadTables, getPool } from "./db"
 
 export type ConsultationPayload = {
@@ -128,26 +138,6 @@ export type StoredAiReadinessAssessment = AiReadinessPayload & {
 
 export type StoredSubscription = SubscriptionPayload & {
   id: string
-  createdAt: string
-}
-
-export type FormSubmission = {
-  id: string
-  type:
-    | "Consultation"
-    | "Footer Lead"
-    | "Hero Lead"
-    | "Quick Session"
-    | "Community Application"
-    | "AI Readiness Assessment"
-    | "Newsletter Subscription"
-    | "Community Waitlist"
-  name: string
-  email: string
-  phone?: string | null
-  company?: string | null
-  details?: string | null
-  source: string
   createdAt: string
 }
 
@@ -380,7 +370,288 @@ function joinDetails(parts: Array<string | null | undefined>): string | undefine
   return filtered.join(" • ")
 }
 
-export async function fetchFormSubmissions(): Promise<FormSubmission[]> {
+function sortByCreatedAtDesc(entries: FormSubmission[]): FormSubmission[] {
+  return [...entries].sort((a, b) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+}
+
+function sortGroupedSubmissions(groups: GroupedFormSubmissions): FormSubmission[] {
+  const combined = FORM_SUBMISSION_TYPES.flatMap((type) => groups[type])
+  return sortByCreatedAtDesc(combined)
+}
+
+function mapConsultationRow(row: ConsultationRow): FormSubmission {
+  const createdAt = toIsoTimestamp(row.created_at)
+  const details = normalizeString(row.additional_info) ?? normalizeString(row.bottleneck)
+  const heardFrom = normalizeString(row.hear_about)
+  const company = normalizeString(row.company)
+  const phone = normalizeString(row.phone)
+  const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+
+  return {
+    id: row.id,
+    type: "Consultation",
+    name: fullName || row.first_name || row.last_name,
+    email: row.email,
+    phone: phone ?? undefined,
+    company: company ?? undefined,
+    details: details ?? undefined,
+    source: heardFrom ? `Consultation Form (${heardFrom})` : "Consultation Form",
+    createdAt,
+  }
+}
+
+function mapFooterLeadRow(row: FooterLeadRow): FormSubmission {
+  const createdAt = toIsoTimestamp(row.created_at)
+  const industry = normalizeString(row.industry)
+  const preferredCall = normalizeString(row.preferred_call_time)
+  const infoParts = [
+    industry ? `Industry: ${industry}` : null,
+    preferredCall ? `Preferred call: ${preferredCall}` : null,
+  ].filter(Boolean) as string[]
+  const company = normalizeString(row.company_name)
+  const name = normalizeString(row.name) ?? row.name
+
+  return {
+    id: row.id,
+    type: "Footer Lead",
+    name,
+    email: row.email,
+    company: company ?? undefined,
+    details: infoParts.length > 0 ? infoParts.join(" • ") : undefined,
+    source: "Footer Lead Form",
+    createdAt,
+  }
+}
+
+function mapHeroLeadRow(row: HeroLeadRow): FormSubmission {
+  const createdAt = toIsoTimestamp(row.created_at)
+  const phone = normalizeString(row.phone ?? undefined)
+  const company = normalizeString(row.company)
+  const name = normalizeString(row.name) ?? row.name
+  const details = joinDetails([
+    `Project focus: ${row.project_focus}`,
+    row.goals ? `Goals: ${row.goals}` : null,
+  ])
+
+  return {
+    id: row.id,
+    type: "Hero Lead",
+    name,
+    email: row.email,
+    phone: phone ?? undefined,
+    company: company ?? undefined,
+    details,
+    source: "Hero Contact Form",
+    createdAt,
+  }
+}
+
+function mapQuickSessionRow(row: QuickSessionRow): FormSubmission {
+  const createdAt = toIsoTimestamp(row.created_at)
+  const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+  const formattedMeeting = normalizeString(row.meeting_format)?.toLowerCase() === "phone" ? "Phone" : "Video"
+  const details = joinDetails([
+    `Challenge: ${row.biggest_challenge}`,
+    formattedMeeting ? `Format: ${formattedMeeting}` : null,
+    `Preferred time: ${row.preferred_time}`,
+    row.notes ? `Notes: ${row.notes}` : null,
+  ])
+
+  return {
+    id: row.id,
+    type: "Quick Session",
+    name: fullName || row.first_name || row.last_name,
+    email: row.email,
+    phone: normalizeString(row.phone) ?? undefined,
+    company: normalizeString(row.company) ?? undefined,
+    details,
+    source: "Quick Session Form",
+    createdAt,
+  }
+}
+
+function mapCommunityApplicationRow(row: CommunityApplicationRow): FormSubmission {
+  const createdAt = toIsoTimestamp(row.created_at)
+  const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+  const details = joinDetails([
+    `Industry: ${row.industry}`,
+    `Team size: ${row.team_size}`,
+    `Challenge: ${row.challenge}`,
+    `Current automation: ${row.has_automation}`,
+    `Desired outcome: ${row.outcome}`,
+    row.referral ? `Referral: ${row.referral}` : null,
+    row.linkedin ? `LinkedIn: ${row.linkedin}` : null,
+  ])
+
+  return {
+    id: row.id,
+    type: "Community Application",
+    name: fullName || row.first_name || row.last_name,
+    email: row.email,
+    company: normalizeString(row.company) ?? undefined,
+    details,
+    source: "Community Application Form",
+    createdAt,
+  }
+}
+
+function mapAiReadinessRow(row: AiReadinessRow): FormSubmission {
+  const createdAt = toIsoTimestamp(row.created_at)
+  const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+  const aiExperience = Array.isArray(row.ai_experience) && row.ai_experience.length > 0 ? row.ai_experience.join(", ") : null
+  const details = joinDetails([
+    `Role: ${row.role}`,
+    `Team size: ${row.team_size}`,
+    `Systems: ${row.current_systems}`,
+    `Data sources: ${row.data_sources}`,
+    aiExperience ? `AI experience: ${aiExperience}` : null,
+    `Goals: ${row.top_goals}`,
+    `Success metrics: ${row.success_metrics}`,
+    `Timeline: ${row.timeline}`,
+    `Budget: ${row.budget_range}`,
+    row.compliance_needs ? `Compliance needs: ${row.compliance_needs}` : null,
+    row.notes ? `Notes: ${row.notes}` : null,
+  ])
+
+  return {
+    id: row.id,
+    type: "AI Readiness Assessment",
+    name: fullName || row.first_name || row.last_name,
+    email: row.email,
+    company: normalizeString(row.company) ?? undefined,
+    details,
+    source: "AI Readiness Assessment",
+    createdAt,
+  }
+}
+
+function mapSubscriptionRow(row: SubscriptionRow): FormSubmission {
+  const createdAt = toIsoTimestamp(row.created_at)
+  const normalizedType = normalizeString(row.subscription_type)?.toLowerCase()
+  const isCommunity = normalizedType === "community"
+  const typeLabel: FormSubmissionType = isCommunity ? "Community Waitlist" : "Newsletter Subscription"
+  const source = isCommunity ? "Community Waitlist Form" : "Newsletter Signup Form"
+
+  return {
+    id: row.id,
+    type: typeLabel,
+    name: row.email,
+    email: row.email,
+    details: joinDetails([`Type: ${typeLabel}`]),
+    source,
+    createdAt,
+  }
+}
+
+function toConsultationRowFromStored(record: StoredConsultation): ConsultationRow {
+  return {
+    id: record.id,
+    first_name: record.firstName,
+    last_name: record.lastName,
+    email: record.email,
+    phone: record.phone,
+    company: record.company,
+    bottleneck: record.bottleneck,
+    additional_info: record.additionalInfo ?? null,
+    hear_about: record.hearAbout ?? null,
+    created_at: record.createdAt,
+  }
+}
+
+function toFooterLeadRowFromStored(record: StoredFooterLead): FooterLeadRow {
+  return {
+    id: record.id,
+    name: record.name,
+    email: record.email,
+    company_name: record.companyName,
+    industry: record.industry,
+    preferred_call_time: record.preferredCallTime,
+    created_at: record.createdAt,
+  }
+}
+
+function toHeroLeadRowFromStored(record: StoredHeroLead): HeroLeadRow {
+  return {
+    id: record.id,
+    name: record.name,
+    email: record.email,
+    company: record.company,
+    phone: record.phone ?? null,
+    project_focus: record.projectFocus,
+    goals: record.goals ?? null,
+    created_at: record.createdAt,
+  }
+}
+
+function toQuickSessionRowFromStored(record: StoredQuickSession): QuickSessionRow {
+  return {
+    id: record.id,
+    first_name: record.firstName,
+    last_name: record.lastName,
+    email: record.email,
+    phone: record.phone,
+    company: record.company,
+    industry: record.industry,
+    biggest_challenge: record.biggestChallenge,
+    meeting_format: record.meetingFormat,
+    preferred_time: record.preferredTime,
+    notes: record.notes ?? null,
+    created_at: record.createdAt,
+  }
+}
+
+function toCommunityApplicationRowFromStored(record: StoredCommunityApplication): CommunityApplicationRow {
+  return {
+    id: record.id,
+    first_name: record.firstName,
+    last_name: record.lastName,
+    email: record.email,
+    company: record.company,
+    industry: record.industry,
+    team_size: record.teamSize,
+    challenge: record.challenge,
+    has_automation: record.hasAutomation,
+    outcome: record.outcome,
+    referral: record.referral ?? null,
+    linkedin: record.linkedin ?? null,
+    created_at: record.createdAt,
+  }
+}
+
+function toAiReadinessRowFromStored(record: StoredAiReadinessAssessment): AiReadinessRow {
+  return {
+    id: record.id,
+    first_name: record.firstName,
+    last_name: record.lastName,
+    email: record.email,
+    company: record.company,
+    role: record.role,
+    team_size: record.teamSize,
+    current_systems: record.currentSystems,
+    data_sources: record.dataSources,
+    ai_experience: record.aiExperience,
+    top_goals: record.topGoals,
+    success_metrics: record.successMetrics,
+    timeline: record.timeline,
+    budget_range: record.budgetRange,
+    compliance_needs: record.complianceNeeds ?? null,
+    notes: record.notes ?? null,
+    created_at: record.createdAt,
+  }
+}
+
+function toSubscriptionRowFromStored(record: StoredSubscription): SubscriptionRow {
+  return {
+    id: record.id,
+    email: record.email,
+    subscription_type: record.type,
+    created_at: record.createdAt,
+  }
+}
+
+async function fetchFormSubmissionsFromDatabase(): Promise<FormSubmissionsResponse> {
   await ensureLeadTables()
 
   const pool = getPool()
@@ -509,183 +780,125 @@ export async function fetchFormSubmissions(): Promise<FormSubmission[]> {
     ),
   ])
 
-  const consultationSubmissions: FormSubmission[] = consultationResult.rows.map((row) => {
-    const createdAt = toIsoTimestamp(row.created_at)
-    const details = normalizeString(row.additional_info) ?? normalizeString(row.bottleneck)
-    const heardFrom = normalizeString(row.hear_about)
-    const company = normalizeString(row.company)
-    const phone = normalizeString(row.phone)
-    const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
+  const grouped = createEmptySubmissionGroups()
+  grouped["Consultation"] = sortByCreatedAtDesc(consultationResult.rows.map(mapConsultationRow))
+  grouped["Footer Lead"] = sortByCreatedAtDesc(footerLeadResult.rows.map(mapFooterLeadRow))
+  grouped["Hero Lead"] = sortByCreatedAtDesc(heroLeadResult.rows.map(mapHeroLeadRow))
+  grouped["Quick Session"] = sortByCreatedAtDesc(quickSessionResult.rows.map(mapQuickSessionRow))
+  grouped["Community Application"] = sortByCreatedAtDesc(
+    communityApplicationsResult.rows.map(mapCommunityApplicationRow),
+  )
+  grouped["AI Readiness Assessment"] = sortByCreatedAtDesc(
+    aiReadinessResult.rows.map(mapAiReadinessRow),
+  )
 
-    return {
-      id: row.id,
-      type: "Consultation",
-      name: fullName || row.first_name || row.last_name,
-      email: row.email,
-      phone: phone ?? undefined,
-      company: company ?? undefined,
-      details: details ?? undefined,
-      source: heardFrom ? `Consultation Form (${heardFrom})` : "Consultation Form",
-      createdAt,
-    }
-  })
+  const subscriptionSubmissions = subscriptionResult.rows.map(mapSubscriptionRow)
+  grouped["Newsletter Subscription"] = sortByCreatedAtDesc(
+    subscriptionSubmissions.filter((submission) => submission.type === "Newsletter Subscription"),
+  )
+  grouped["Community Waitlist"] = sortByCreatedAtDesc(
+    subscriptionSubmissions.filter((submission) => submission.type === "Community Waitlist"),
+  )
 
-  const footerLeadSubmissions: FormSubmission[] = footerLeadResult.rows.map((row) => {
-    const createdAt = toIsoTimestamp(row.created_at)
-    const industry = normalizeString(row.industry)
-    const preferredCall = normalizeString(row.preferred_call_time)
-    const infoParts = [
-      industry ? `Industry: ${industry}` : null,
-      preferredCall ? `Preferred call: ${preferredCall}` : null,
-    ].filter(Boolean) as string[]
-    const company = normalizeString(row.company_name)
-    const name = normalizeString(row.name) ?? row.name
-
-    return {
-      id: row.id,
-      type: "Footer Lead",
-      name,
-      email: row.email,
-      company: company ?? undefined,
-      details: infoParts.length > 0 ? infoParts.join(" • ") : undefined,
-      source: "Footer Lead Form",
-      createdAt,
-    }
-  })
-
-  const heroLeadSubmissions: FormSubmission[] = heroLeadResult.rows.map((row) => {
-    const createdAt = toIsoTimestamp(row.created_at)
-    const phone = normalizeString(row.phone ?? undefined)
-    const company = normalizeString(row.company)
-    const name = normalizeString(row.name) ?? row.name
-    const details = joinDetails([
-      `Project focus: ${row.project_focus}`,
-      row.goals ? `Goals: ${row.goals}` : null,
-    ])
-
-    return {
-      id: row.id,
-      type: "Hero Lead",
-      name,
-      email: row.email,
-      phone: phone ?? undefined,
-      company: company ?? undefined,
-      details,
-      source: "Hero Contact Form",
-      createdAt,
-    }
-  })
-
-  const quickSessionSubmissions: FormSubmission[] = quickSessionResult.rows.map((row) => {
-    const createdAt = toIsoTimestamp(row.created_at)
-    const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
-    const formattedMeeting = normalizeString(row.meeting_format)?.toLowerCase() === "phone" ? "Phone" : "Video"
-    const details = joinDetails([
-      `Challenge: ${row.biggest_challenge}`,
-      formattedMeeting ? `Format: ${formattedMeeting}` : null,
-      `Preferred time: ${row.preferred_time}`,
-      row.notes ? `Notes: ${row.notes}` : null,
-    ])
-
-    return {
-      id: row.id,
-      type: "Quick Session",
-      name: fullName || row.first_name || row.last_name,
-      email: row.email,
-      phone: normalizeString(row.phone) ?? undefined,
-      company: normalizeString(row.company) ?? undefined,
-      details,
-      source: "Quick Session Form",
-      createdAt,
-    }
-  })
-
-  const communitySubmissions: FormSubmission[] = communityApplicationsResult.rows.map((row) => {
-    const createdAt = toIsoTimestamp(row.created_at)
-    const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
-    const details = joinDetails([
-      `Industry: ${row.industry}`,
-      `Team size: ${row.team_size}`,
-      `Challenge: ${row.challenge}`,
-      `Current automation: ${row.has_automation}`,
-      `Desired outcome: ${row.outcome}`,
-      row.referral ? `Referral: ${row.referral}` : null,
-      row.linkedin ? `LinkedIn: ${row.linkedin}` : null,
-    ])
-
-    return {
-      id: row.id,
-      type: "Community Application",
-      name: fullName || row.first_name || row.last_name,
-      email: row.email,
-      company: normalizeString(row.company) ?? undefined,
-      details,
-      source: "Community Application Form",
-      createdAt,
-    }
-  })
-
-  const aiReadinessSubmissions: FormSubmission[] = aiReadinessResult.rows.map((row) => {
-    const createdAt = toIsoTimestamp(row.created_at)
-    const fullName = `${normalizeString(row.first_name) ?? ""} ${normalizeString(row.last_name) ?? ""}`.trim()
-    const aiExperience = Array.isArray(row.ai_experience) && row.ai_experience.length > 0 ? row.ai_experience.join(", ") : null
-    const details = joinDetails([
-      `Role: ${row.role}`,
-      `Team size: ${row.team_size}`,
-      `Systems: ${row.current_systems}`,
-      `Data sources: ${row.data_sources}`,
-      aiExperience ? `AI experience: ${aiExperience}` : null,
-      `Goals: ${row.top_goals}`,
-      `Success metrics: ${row.success_metrics}`,
-      `Timeline: ${row.timeline}`,
-      `Budget: ${row.budget_range}`,
-      row.compliance_needs ? `Compliance needs: ${row.compliance_needs}` : null,
-      row.notes ? `Notes: ${row.notes}` : null,
-    ])
-
-    return {
-      id: row.id,
-      type: "AI Readiness Assessment",
-      name: fullName || row.first_name || row.last_name,
-      email: row.email,
-      company: normalizeString(row.company) ?? undefined,
-      details,
-      source: "AI Readiness Assessment",
-      createdAt,
-    }
-  })
-
-  const subscriptionSubmissions: FormSubmission[] = subscriptionResult.rows.map((row) => {
-    const createdAt = toIsoTimestamp(row.created_at)
-    const normalizedType = normalizeString(row.subscription_type)?.toLowerCase()
-    const isCommunity = normalizedType === "community"
-    const typeLabel = isCommunity ? "Community Waitlist" : "Newsletter Subscription"
-    const source = isCommunity ? "Community Waitlist Form" : "Newsletter Signup Form"
-
-    return {
-      id: row.id,
-      type: typeLabel,
-      name: row.email,
-      email: row.email,
-      details: joinDetails([`Type: ${typeLabel}`]),
-      source,
-      createdAt,
-    }
-  })
-
-  return [
-    ...consultationSubmissions,
-    ...footerLeadSubmissions,
-    ...heroLeadSubmissions,
-    ...quickSessionSubmissions,
-    ...communitySubmissions,
-    ...aiReadinessSubmissions,
-    ...subscriptionSubmissions,
-  ].sort((a, b) => {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  })
+  return {
+    submissions: sortGroupedSubmissions(grouped),
+    groupedByType: grouped,
+    source: "database",
+  }
 }
 
+type LeadsFileContents = Partial<{
+  consultations: StoredConsultation[]
+  footerLeads: StoredFooterLead[]
+  heroLeads: StoredHeroLead[]
+  quickSessions: StoredQuickSession[]
+  communityApplications: StoredCommunityApplication[]
+  aiReadinessAssessments: StoredAiReadinessAssessment[]
+  aiReadiness: StoredAiReadinessAssessment[]
+  subscriptions: StoredSubscription[]
+}>
+
+async function fetchFormSubmissionsFromFile(): Promise<FormSubmissionsResponse> {
+  const fallbackPath = path.join(process.cwd(), "data", "leads.json")
+  const grouped = createEmptySubmissionGroups()
+
+  try {
+    const fileContents = await readFile(fallbackPath, "utf8")
+    const parsed = JSON.parse(fileContents) as LeadsFileContents
+
+    const consultations = Array.isArray(parsed.consultations) ? parsed.consultations : []
+    grouped["Consultation"] = sortByCreatedAtDesc(
+      consultations.map((record) => mapConsultationRow(toConsultationRowFromStored(record))),
+    )
+
+    const footerLeads = Array.isArray(parsed.footerLeads) ? parsed.footerLeads : []
+    grouped["Footer Lead"] = sortByCreatedAtDesc(
+      footerLeads.map((record) => mapFooterLeadRow(toFooterLeadRowFromStored(record))),
+    )
+
+    const heroLeads = Array.isArray(parsed.heroLeads) ? parsed.heroLeads : []
+    grouped["Hero Lead"] = sortByCreatedAtDesc(
+      heroLeads.map((record) => mapHeroLeadRow(toHeroLeadRowFromStored(record))),
+    )
+
+    const quickSessions = Array.isArray(parsed.quickSessions) ? parsed.quickSessions : []
+    grouped["Quick Session"] = sortByCreatedAtDesc(
+      quickSessions.map((record) => mapQuickSessionRow(toQuickSessionRowFromStored(record))),
+    )
+
+    const communityApplications = Array.isArray(parsed.communityApplications)
+      ? parsed.communityApplications
+      : []
+    grouped["Community Application"] = sortByCreatedAtDesc(
+      communityApplications.map((record) =>
+        mapCommunityApplicationRow(toCommunityApplicationRowFromStored(record)),
+      ),
+    )
+
+    const aiReadinessRecords = Array.isArray(parsed.aiReadinessAssessments)
+      ? parsed.aiReadinessAssessments
+      : Array.isArray(parsed.aiReadiness)
+        ? parsed.aiReadiness
+        : []
+    grouped["AI Readiness Assessment"] = sortByCreatedAtDesc(
+      aiReadinessRecords.map((record) => mapAiReadinessRow(toAiReadinessRowFromStored(record))),
+    )
+
+    const subscriptionRecords = Array.isArray(parsed.subscriptions) ? parsed.subscriptions : []
+    const subscriptionSubmissions = subscriptionRecords.map((record) =>
+      mapSubscriptionRow(toSubscriptionRowFromStored(record)),
+    )
+    grouped["Newsletter Subscription"] = sortByCreatedAtDesc(
+      subscriptionSubmissions.filter((submission) => submission.type === "Newsletter Subscription"),
+    )
+    grouped["Community Waitlist"] = sortByCreatedAtDesc(
+      subscriptionSubmissions.filter((submission) => submission.type === "Community Waitlist"),
+    )
+  } catch (error) {
+    console.warn("Unable to read fallback submissions from data/leads.json", error)
+  }
+
+  return {
+    submissions: sortGroupedSubmissions(grouped),
+    groupedByType: grouped,
+    source: "fallback",
+  }
+}
+
+export async function fetchFormSubmissions(): Promise<FormSubmissionsResponse> {
+  try {
+    return await fetchFormSubmissionsFromDatabase()
+  } catch (databaseError) {
+    console.error("Failed to load form submissions from database", databaseError)
+
+    try {
+      return await fetchFormSubmissionsFromFile()
+    } catch (fallbackError) {
+      console.error("Failed to load form submissions from fallback file", fallbackError)
+      throw new Error("Unable to load form submissions from database or fallback file")
+    }
+  }
+}
 
 export async function fetchFooterLeads(): Promise<StoredFooterLead[]> {
   await ensureLeadTables()

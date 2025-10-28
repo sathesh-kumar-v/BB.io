@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    const submissions = await fetchFormSubmissions()
+    const { submissions, groupedByType, source } = await fetchFormSubmissions()
 
-    return NextResponse.json({ submissions })
+    return NextResponse.json({ submissions, groupedByType, source })
   } catch (error) {
     console.error("Failed to load form submissions", error)
     return NextResponse.json(

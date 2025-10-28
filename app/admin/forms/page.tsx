@@ -1,67 +1,22 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Download, Filter } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Search, Download, Filter, RefreshCcw, LayoutGrid } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-
-type FormSubmission = {
-  id: string
-  type: string
-  name: string
-  email: string
-  phone?: string
-  company?: string
-  details?: string
-  source: string
-  createdAt: string
-}
+import { useFormSubmissions } from "@/components/admin/forms/use-form-submissions"
+import { getTypeBadgeColor } from "@/components/admin/forms/utils"
+import type { FormSubmission } from "@/types/forms"
 
 export default function FormsPage() {
-  const [submissions, setSubmissions] = useState<FormSubmission[]>([])
+  const { submissions, loading, error, isFallbackData, reload } = useFormSubmissions()
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("all")
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function loadSubmissions() {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch("/api/forms", { signal: controller.signal })
-
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`)
-        }
-
-        const data = (await response.json()) as { submissions?: FormSubmission[] }
-        setSubmissions(data.submissions ?? [])
-      } catch (fetchError) {
-        if ((fetchError as Error).name === "AbortError") {
-          return
-        }
-
-        console.error("Unable to load submissions", fetchError)
-        setError("We couldn't load the latest submissions. Please try again later.")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadSubmissions()
-
-    return () => {
-      controller.abort()
-    }
-  }, [])
 
   const submissionTypes = useMemo(() => {
     const types = new Set<string>()
@@ -103,6 +58,10 @@ export default function FormsPage() {
   }, [submissions, filterType, searchQuery])
 
   const handleExportCSV = () => {
+    if (filteredSubmissions.length === 0) {
+      return
+    }
+
     const headers = ["Name", "Email", "Phone", "Company", "Details", "Source", "Type", "Submitted"]
 
     const csvData = filteredSubmissions.map((submission) => [
@@ -137,42 +96,48 @@ export default function FormsPage() {
     window.URL.revokeObjectURL(url)
   }
 
-  const getTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case "Consultation":
-        return "bg-purple-500/10 text-purple-400 border-purple-500/20"
-      case "Footer Lead":
-        return "bg-blue-500/10 text-blue-400 border-blue-500/20"
-      case "Hero Lead":
-        return "bg-orange-500/10 text-orange-400 border-orange-500/20"
-      case "Quick Session":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-      case "Community Application":
-        return "bg-amber-500/10 text-amber-500 border-amber-500/20"
-      case "AI Readiness Assessment":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/20"
-      case "Newsletter Subscription":
-        return "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
-      case "Community Waitlist":
-        return "bg-teal-500/10 text-teal-400 border-teal-500/20"
-      default:
-        return "bg-muted/10 text-muted-foreground border-border"
+  const summaryText = useMemo(() => {
+    if (loading) {
+      return "Loading submissions..."
     }
-  }
 
-  const resultsSummary = loading
-    ? "Loading submissions..."
-    : error
-      ? "Unable to display submissions."
-      : `Showing ${filteredSubmissions.length} of ${submissions.length} submissions`
+    if (error) {
+      return "Unable to display submissions."
+    }
+
+    if (submissions.length === 0) {
+      return "No submissions available yet."
+    }
+
+    return `Showing ${filteredSubmissions.length} of ${submissions.length} submissions`
+  }, [loading, error, submissions.length, filteredSubmissions.length])
+
+  const handleRefresh = () => {
+    void reload()
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Form Submissions</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage all website form submissions collected from your lead capture flows
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Form Submissions</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage all website form submissions collected from your lead capture flows
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button onClick={handleRefresh} variant="outline" disabled={loading} className="flex items-center gap-2">
+            <RefreshCcw className="w-4 h-4" />
+            Refresh
+          </Button>
+          <Button asChild className="flex items-center gap-2">
+            <Link href="/admin/forms/by-type">
+              <LayoutGrid className="w-4 h-4" />
+              View by type
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card className="p-4 border-border bg-card">
@@ -190,7 +155,11 @@ export default function FormsPage() {
             </div>
           </div>
 
-          <Select value={filterType} onValueChange={setFilterType} disabled={loading && submissions.length === 0}>
+          <Select
+            value={filterType}
+            onValueChange={setFilterType}
+            disabled={loading && submissions.length === 0}
+          >
             <SelectTrigger className="w-full md:w-48">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Filter by type" />
@@ -205,14 +174,26 @@ export default function FormsPage() {
             </SelectContent>
           </Select>
 
-          <Button onClick={handleExportCSV} variant="outline" disabled={filteredSubmissions.length === 0}>
-            <Download className="w-4 h-4 mr-2" />
+          <Button
+            onClick={handleExportCSV}
+            variant="outline"
+            disabled={filteredSubmissions.length === 0 || loading}
+            className="flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
             Export CSV
           </Button>
         </div>
       </Card>
 
-      <div className="text-sm text-muted-foreground">{resultsSummary}</div>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span>{summaryText}</span>
+        {isFallbackData && !loading && !error ? (
+          <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300">
+            Fallback data
+          </Badge>
+        ) : null}
+      </div>
 
       {error ? (
         <Card className="border-destructive/20 bg-destructive/10 text-destructive-foreground p-4">
@@ -254,7 +235,7 @@ export default function FormsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredSubmissions.map((submission) => (
+              filteredSubmissions.map((submission: FormSubmission) => (
                 <TableRow key={submission.id} className="border-border hover:bg-muted/5">
                   <TableCell className="font-medium text-foreground">{submission.name}</TableCell>
                   <TableCell className="text-foreground">{submission.email}</TableCell>
