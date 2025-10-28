@@ -992,7 +992,7 @@ export default function IndustriesPage() {
                   <span>First look at new solutions</span>
                 </li>
               </ul>
-              <Button size="lg" variant="outline" className="w-full bg-transparent" asChild>
+              <Button size="lg" variant="outline" className="w-full bg-transparent text-primary" asChild>
                 <Link href="/community">Join the Community</Link>
               </Button>
             </div>

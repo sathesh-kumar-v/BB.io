@@ -35,11 +35,54 @@ export default function CommunityPage() {
     referral: "",
     linkedin: "",
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] Form submitted:", formData)
-    // Handle form submission
+    void submitForm()
+  }
+
+  const submitForm = async () => {
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/community-applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || "Unable to submit your application right now.")
+      }
+
+      setIsSubmitted(true)
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        company: "",
+        industry: "",
+        teamSize: "",
+        challenge: "",
+        hasAutomation: "",
+        outcome: "",
+        referral: "",
+        linkedin: "",
+      })
+    } catch (submissionError) {
+      if (submissionError instanceof Error) {
+        setError(submissionError.message)
+      } else {
+        setError("Something went wrong. Please try again in a moment.")
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -457,133 +500,151 @@ export default function CommunityPage() {
             Ready to Transform How You Think About Business?
           </h2>
 
-          <form onSubmit={handleSubmit} className="mt-12 space-y-6">
-            <div className="grid gap-6 sm:grid-cols-2">
+          {isSubmitted ? (
+            <div className="mt-12 space-y-4 rounded-lg border border-border bg-card p-6 text-center">
+              <h3 className="text-xl font-semibold">Application received</h3>
+              <p className="text-muted-foreground">
+                We'll review your answers and follow up with next steps for community access.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsSubmitted(false)}
+                className="text-sm font-medium text-primary hover:text-primary/80"
+              >
+                Submit another application
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="mt-12 space-y-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name *</Label>
+                  <Input
+                    id="firstName"
+                    required
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Input
+                    id="lastName"
+                    required
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name *</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
-                  id="firstName"
+                  id="email"
+                  type="email"
                   required
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
+
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company Name *</Label>
+                  <Input
+                    id="company"
+                    required
+                    value={formData.company}
+                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="industry">Industry *</Label>
+                  <Input
+                    id="industry"
+                    required
+                    value={formData.industry}
+                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name *</Label>
+                <Label htmlFor="teamSize">Current Team Size *</Label>
                 <Input
-                  id="lastName"
+                  id="teamSize"
                   required
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  value={formData.teamSize}
+                  onChange={(e) => setFormData({ ...formData, teamSize: e.target.value })}
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-
-            <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="company">Company Name *</Label>
-                <Input
-                  id="company"
+                <Label htmlFor="challenge">Biggest Operational Challenge Right Now *</Label>
+                <Textarea
+                  id="challenge"
                   required
-                  value={formData.company}
-                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                  rows={3}
+                  value={formData.challenge}
+                  onChange={(e) => setFormData({ ...formData, challenge: e.target.value })}
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="industry">Industry *</Label>
-                <Input
-                  id="industry"
+                <Label htmlFor="hasAutomation">Have you implemented any automation already? *</Label>
+                <Textarea
+                  id="hasAutomation"
                   required
-                  value={formData.industry}
-                  onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                  rows={2}
+                  placeholder="Yes/No and details..."
+                  value={formData.hasAutomation}
+                  onChange={(e) => setFormData({ ...formData, hasAutomation: e.target.value })}
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="teamSize">Current Team Size *</Label>
-              <Input
-                id="teamSize"
-                required
-                value={formData.teamSize}
-                onChange={(e) => setFormData({ ...formData, teamSize: e.target.value })}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="outcome">What specific outcome are you hoping to achieve? *</Label>
+                <Textarea
+                  id="outcome"
+                  required
+                  rows={3}
+                  value={formData.outcome}
+                  onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="challenge">Biggest Operational Challenge Right Now *</Label>
-              <Textarea
-                id="challenge"
-                required
-                rows={3}
-                value={formData.challenge}
-                onChange={(e) => setFormData({ ...formData, challenge: e.target.value })}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="referral">How did you hear about us? *</Label>
+                <Input
+                  id="referral"
+                  required
+                  value={formData.referral}
+                  onChange={(e) => setFormData({ ...formData, referral: e.target.value })}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="hasAutomation">Have you implemented any automation already? *</Label>
-              <Textarea
-                id="hasAutomation"
-                required
-                rows={2}
-                placeholder="Yes/No and details..."
-                value={formData.hasAutomation}
-                onChange={(e) => setFormData({ ...formData, hasAutomation: e.target.value })}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="linkedin">LinkedIn Profile (optional)</Label>
+                <Input
+                  id="linkedin"
+                  type="url"
+                  placeholder="https://linkedin.com/in/..."
+                  value={formData.linkedin}
+                  onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="outcome">What specific outcome are you hoping to achieve? *</Label>
-              <Textarea
-                id="outcome"
-                required
-                rows={3}
-                value={formData.outcome}
-                onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
-              />
-            </div>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-            <div className="space-y-2">
-              <Label htmlFor="referral">How did you hear about us? *</Label>
-              <Input
-                id="referral"
-                required
-                value={formData.referral}
-                onChange={(e) => setFormData({ ...formData, referral: e.target.value })}
-              />
-            </div>
+              <Button type="submit" size="lg" className="w-full text-base" disabled={isSubmitting}>
+                {isSubmitting ? "Submitting..." : "Submit My Application"}
+              </Button>
 
-            <div className="space-y-2">
-              <Label htmlFor="linkedin">LinkedIn Profile (optional)</Label>
-              <Input
-                id="linkedin"
-                type="url"
-                placeholder="https://linkedin.com/in/..."
-                value={formData.linkedin}
-                onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
-              />
-            </div>
-
-            <Button type="submit" size="lg" className="w-full text-base">
-              Submit My Application
-            </Button>
-
-            <p className="text-center text-sm text-muted-foreground">
-              Applications reviewed within 48 hours • No spam, ever
-            </p>
-          </form>
+              <p className="text-center text-sm text-muted-foreground">
+                Applications reviewed within 48 hours • No spam, ever
+              </p>
+            </form>
+          )}
         </div>
       </section>
 
