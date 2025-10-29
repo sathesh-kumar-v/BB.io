@@ -147,7 +147,7 @@ export default function FooterLeadsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Footer Leads</h1>
+        <h1 className="text-3xl font-bold text-foreground">Quick Calls</h1>
         <p className="text-muted-foreground mt-1">
           Review all leads captured from the footer contact form across your site.
         </p>
