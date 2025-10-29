@@ -1,325 +1,555 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Download, Filter, RefreshCcw, Search } from "lucide-react"
 
-// Mock data
-const mockConsultations = [
-  {
-    id: 1,
-    name: "Sarah Smith",
-    email: "sarah@example.com",
-    phone: "+1 234 567 8901",
-    preferredDate: "2025-01-20",
-    preferredTime: "10:00 AM",
-    message: "Need consultation for property management CRM",
-    status: "New",
-    createdAt: "2025-01-15T09:15:00",
-  },
-  {
-    id: 2,
-    name: "Robert Brown",
-    email: "robert@example.com",
-    phone: "+1 234 567 8904",
-    preferredDate: "2025-01-22",
-    preferredTime: "2:00 PM",
-    message: "Interested in AI automation for construction business",
-    status: "Contacted",
-    createdAt: "2025-01-14T11:30:00",
-  },
-  {
-    id: 3,
-    name: "Emily Davis",
-    email: "emily@example.com",
-    phone: "+1 234 567 8905",
-    preferredDate: "2025-01-18",
-    preferredTime: "3:00 PM",
-    message: "Want to discuss mobile app development",
-    status: "Done",
-    createdAt: "2025-01-13T14:20:00",
-  },
-]
+type Consultation = {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  company: string
+  industry: string
+  industryOther?: string
+  companySize: string
+  revenue?: string
+  bottleneck: string
+  challenges: string[]
+  challengesOther?: string
+  timeConsumers?: string
+  automationExperience: string
+  timeline: string
+  drivingFactors: string[]
+  drivingFactorsOther?: string
+  consultationFormat: string
+  bestTimes: string[]
+  additionalInfo?: string
+  hearAbout?: string
+  referralName?: string
+  emailUpdates: boolean
+  weeklyInsights: boolean
+  eventNotifications: boolean
+  createdAt: string
+}
 
 export default function ConsultationsPage() {
+  const [consultations, setConsultations] = useState<Consultation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [filterStatus, setFilterStatus] = useState("all")
-  const [consultations, setConsultations] = useState(mockConsultations)
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<"table" | "calendar">("table")
+  const [formatFilter, setFormatFilter] = useState("all")
+  const [timelineFilter, setTimelineFilter] = useState("all")
+  const [selectedConsultation, setSelectedConsultation] = useState<Consultation | null>(null)
 
-  const filteredConsultations = consultations.filter((consultation) => {
-    const matchesSearch =
-      consultation.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      consultation.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      consultation.message.toLowerCase().includes(searchQuery.toLowerCase())
+  const loadConsultations = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true)
+    setError(null)
 
-    const matchesFilter = filterStatus === "all" || consultation.status === filterStatus
+    try {
+      const response = await fetch("/api/consultations", { signal })
 
-    return matchesSearch && matchesFilter
-  })
-
-  const handleStatusChange = (id: number, newStatus: string) => {
-    setConsultations((prev) =>
-      prev.map((consultation) => (consultation.id === id ? { ...consultation, status: newStatus } : consultation)),
-    )
-  }
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case "New":
-        return "bg-blue-100 text-blue-700"
-      case "Contacted":
-        return "bg-amber-100 text-amber-700"
-      case "Done":
-        return "bg-green-100 text-green-700"
-      default:
-        return "bg-gray-100 text-gray-700"
-    }
-  }
-
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear()
-    const month = date.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const daysInMonth = lastDay.getDate()
-    const startingDayOfWeek = firstDay.getDay()
-
-    return { daysInMonth, startingDayOfWeek }
-  }
-
-  const getConsultationsForDate = (date: Date) => {
-    const dateStr = date.toISOString().split("T")[0]
-    return consultations.filter((c) => c.preferredDate === dateStr)
-  }
-
-  const navigateMonth = (direction: "prev" | "next") => {
-    setCurrentDate((prev) => {
-      const newDate = new Date(prev)
-      if (direction === "prev") {
-        newDate.setMonth(newDate.getMonth() - 1)
-      } else {
-        newDate.setMonth(newDate.getMonth() + 1)
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
       }
-      return newDate
+
+      const data = (await response.json()) as { consultations?: Consultation[] }
+      setConsultations(data.consultations ?? [])
+    } catch (fetchError) {
+      if ((fetchError as Error).name === "AbortError") {
+        return
+      }
+
+      console.error("Unable to load consultations", fetchError)
+      setError("We couldn't load the latest consultations. Please try again later.")
+      setConsultations([])
+    } finally {
+      if (!signal?.aborted) {
+        setLoading(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    void loadConsultations(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
+  }, [loadConsultations])
+
+  const formats = useMemo(() => {
+    const unique = new Set<string>()
+
+    for (const consultation of consultations) {
+      if (consultation.consultationFormat) {
+        unique.add(consultation.consultationFormat)
+      }
+    }
+
+    return Array.from(unique).sort((a, b) => a.localeCompare(b))
+  }, [consultations])
+
+  const timelines = useMemo(() => {
+    const unique = new Set<string>()
+
+    for (const consultation of consultations) {
+      if (consultation.timeline) {
+        unique.add(consultation.timeline)
+      }
+    }
+
+    return Array.from(unique).sort((a, b) => a.localeCompare(b))
+  }, [consultations])
+
+  const filteredConsultations = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    return consultations.filter((consultation) => {
+      const matchesFormat = formatFilter === "all" || consultation.consultationFormat === formatFilter
+      const matchesTimeline = timelineFilter === "all" || consultation.timeline === timelineFilter
+
+      if (!matchesFormat || !matchesTimeline) {
+        return false
+      }
+
+      if (!normalizedQuery) {
+        return true
+      }
+
+      const haystack = [
+        `${consultation.firstName} ${consultation.lastName}`,
+        consultation.email,
+        consultation.phone,
+        consultation.company,
+        consultation.industry,
+        consultation.industryOther,
+        consultation.bottleneck,
+        consultation.additionalInfo,
+        consultation.hearAbout,
+        consultation.timeline,
+        consultation.consultationFormat,
+        consultation.referralName,
+        consultation.revenue,
+        consultation.companySize,
+        ...consultation.challenges,
+        consultation.challengesOther,
+        consultation.timeConsumers,
+        consultation.automationExperience,
+        ...consultation.drivingFactors,
+        consultation.drivingFactorsOther,
+        ...consultation.bestTimes,
+      ]
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.toLowerCase())
+
+      return haystack.some((value) => value.includes(normalizedQuery))
     })
+  }, [consultations, formatFilter, timelineFilter, searchQuery])
+
+  const resultsSummary = loading
+    ? "Loading consultations..."
+    : error
+      ? "Unable to display consultations."
+      : `Showing ${filteredConsultations.length} of ${consultations.length} consultations`
+
+  const latestConsultationDate = consultations[0]?.createdAt ? new Date(consultations[0].createdAt) : null
+  const emailOptIns = consultations.filter((consultation) => consultation.emailUpdates).length
+  const insightOptIns = consultations.filter((consultation) => consultation.weeklyInsights).length
+
+  const handleExportCSV = () => {
+    if (filteredConsultations.length === 0) {
+      return
+    }
+
+    const headers = [
+      "Name",
+      "Email",
+      "Phone",
+      "Company",
+      "Industry",
+      "Format",
+      "Timeline",
+      "Bottleneck",
+      "Automation Experience",
+      "Challenges",
+      "Driving Factors",
+      "Best Times",
+      "Submitted At",
+    ]
+
+    const csvData = filteredConsultations.map((consultation) => [
+      `${consultation.firstName} ${consultation.lastName}`.trim(),
+      consultation.email,
+      consultation.phone,
+      consultation.company,
+      consultation.industry,
+      consultation.consultationFormat,
+      consultation.timeline,
+      consultation.bottleneck,
+      consultation.automationExperience,
+      consultation.challenges.join("; "),
+      consultation.drivingFactors.join("; "),
+      consultation.bestTimes.join("; "),
+      new Date(consultation.createdAt).toLocaleString(),
+    ])
+
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map((row) =>
+        row
+          .map((cell) => {
+            const normalized = cell.replace(/"/g, '""')
+            return `"${normalized}"`
+          })
+          .join(","),
+      ),
+    ].join("\n")
+
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `consultations-${new Date().toISOString().split("T")[0]}.csv`
+    anchor.click()
+    window.URL.revokeObjectURL(url)
   }
 
-  const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate)
-  const monthName = currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  const handleRefresh = () => {
+    void loadConsultations()
+  }
+
+  const closeDialog = () => {
+    setSelectedConsultation(null)
+  }
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Consultation Requests</h1>
-        <p className="text-gray-600 mt-1">Manage and track all consultation bookings</p>
+        <h1 className="text-3xl font-bold text-foreground">Consultation Requests</h1>
+        <p className="text-muted-foreground mt-1">
+          Review detailed consultation submissions captured from the scheduling form.
+        </p>
       </div>
 
-      {/* Filters and Actions */}
-      <Card className="p-4 bg-white shadow-sm">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="p-6 border-border bg-card">
+          <div className="text-sm font-medium text-muted-foreground">Total Consultations</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{consultations.length}</div>
+        </Card>
+        <Card className="p-6 border-border bg-card">
+          <div className="text-sm font-medium text-muted-foreground">Email Opt-ins</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{emailOptIns}</div>
+        </Card>
+        <Card className="p-6 border-border bg-card">
+          <div className="text-sm font-medium text-muted-foreground">Weekly Insights Opt-ins</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{insightOptIns}</div>
+        </Card>
+        <Card className="p-6 border-border bg-card">
+          <div className="text-sm font-medium text-muted-foreground">Most Recent Submission</div>
+          <div className="text-lg font-semibold text-foreground mt-2">
+            {latestConsultationDate ? latestConsultationDate.toLocaleString() : "—"}
+          </div>
+        </Card>
+      </div>
+
+      {error ? (
+        <Card className="p-4 border-destructive/40 bg-destructive/10 text-destructive">{error}</Card>
+      ) : null}
+
+      <Card className="p-4 border-border bg-card">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+          <div className="flex-1 w-full">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search consultations..."
+                placeholder="Search by name, company, challenge, or keyword..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-gray-50"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="pl-10"
               />
             </div>
           </div>
 
-          {/* Filter by Status */}
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <Select value={formatFilter} onValueChange={setFormatFilter} disabled={formats.length === 0}>
             <SelectTrigger className="w-full md:w-48">
-              <SelectValue placeholder="Filter by status" />
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Filter by format" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="New">New</SelectItem>
-              <SelectItem value="Contacted">Contacted</SelectItem>
-              <SelectItem value="Done">Done</SelectItem>
+              <SelectItem value="all">All Formats</SelectItem>
+              {formats.map((format) => (
+                <SelectItem key={format} value={format}>
+                  {format}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={timelineFilter} onValueChange={setTimelineFilter} disabled={timelines.length === 0}>
+            <SelectTrigger className="w-full md:w-48">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Filter by timeline" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Timelines</SelectItem>
+              {timelines.map((timeline) => (
+                <SelectItem key={timeline} value={timeline}>
+                  {timeline}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
           <div className="flex gap-2">
-            <Button
-              variant={view === "table" ? "default" : "outline"}
-              onClick={() => setView("table")}
-              className={view === "table" ? "bg-amber-500 hover:bg-amber-600" : ""}
-            >
-              Table View
+            <Button variant="outline" onClick={handleRefresh} disabled={loading} className="flex items-center gap-2">
+              <RefreshCcw className="w-4 h-4" />
+              Refresh
             </Button>
             <Button
-              variant={view === "calendar" ? "default" : "outline"}
-              onClick={() => setView("calendar")}
-              className={view === "calendar" ? "bg-amber-500 hover:bg-amber-600" : ""}
+              onClick={handleExportCSV}
+              variant="outline"
+              disabled={filteredConsultations.length === 0 || loading}
+              className="flex items-center gap-2"
             >
-              <CalendarIcon className="w-4 h-4 mr-2" />
-              Calendar View
+              <Download className="w-4 h-4" />
+              Export CSV
             </Button>
           </div>
         </div>
       </Card>
 
-      {/* Results Count */}
-      <div className="text-sm text-gray-600">
-        Showing {filteredConsultations.length} of {consultations.length} consultations
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span>{resultsSummary}</span>
+        {loading ? <Badge variant="secondary">Loading</Badge> : null}
       </div>
 
-      {view === "table" ? (
-        <Card className="bg-white shadow-sm">
-          <Table>
-            <TableHeader>
+      <Card className="border-border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-muted-foreground">Name</TableHead>
+              <TableHead className="text-muted-foreground">Email</TableHead>
+              <TableHead className="text-muted-foreground">Company</TableHead>
+              <TableHead className="text-muted-foreground">Industry</TableHead>
+              <TableHead className="text-muted-foreground">Format</TableHead>
+              <TableHead className="text-muted-foreground">Timeline</TableHead>
+              <TableHead className="text-muted-foreground">Primary Need</TableHead>
+              <TableHead className="text-muted-foreground">Submitted</TableHead>
+              <TableHead className="text-muted-foreground">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead className="text-gray-700">Name</TableHead>
-                <TableHead className="text-gray-700">Email</TableHead>
-                <TableHead className="text-gray-700">Phone</TableHead>
-                <TableHead className="text-gray-700">Preferred Date/Time</TableHead>
-                <TableHead className="text-gray-700">Message</TableHead>
-                <TableHead className="text-gray-700">Status</TableHead>
-                <TableHead className="text-gray-700">Actions</TableHead>
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  Loading consultations...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredConsultations.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    No consultations found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredConsultations.map((consultation) => (
-                  <TableRow key={consultation.id}>
-                    <TableCell className="font-medium text-gray-900">{consultation.name}</TableCell>
-                    <TableCell className="text-gray-700">{consultation.email}</TableCell>
-                    <TableCell className="text-gray-700">{consultation.phone}</TableCell>
+            ) : filteredConsultations.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  No consultations found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredConsultations.map((consultation) => {
+                const name = `${consultation.firstName} ${consultation.lastName}`.trim() || consultation.email
+
+                return (
+                  <TableRow key={consultation.id} className="border-border hover:bg-muted/5">
+                    <TableCell className="font-medium text-foreground">{name}</TableCell>
+                    <TableCell className="text-foreground">{consultation.email}</TableCell>
+                    <TableCell className="text-foreground">{consultation.company}</TableCell>
+                    <TableCell className="text-foreground">{consultation.industry}</TableCell>
                     <TableCell>
-                      <div className="text-sm">
-                        <div className="text-gray-900">{new Date(consultation.preferredDate).toLocaleDateString()}</div>
-                        <div className="text-gray-500">{consultation.preferredTime}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-gray-700">{consultation.message}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusBadgeColor(consultation.status)}>{consultation.status}</Badge>
+                      <Badge variant="outline">{consultation.consultationFormat}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Select
-                        value={consultation.status}
-                        onValueChange={(value) => handleStatusChange(consultation.id, value)}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="New">New</SelectItem>
-                          <SelectItem value="Contacted">Contacted</SelectItem>
-                          <SelectItem value="Done">Done</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Badge variant="secondary">{consultation.timeline}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-md truncate text-foreground">{consultation.bottleneck}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(consultation.createdAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" onClick={() => setSelectedConsultation(consultation)}>
+                        View details
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </Card>
-      ) : (
-        <Card className="p-6 bg-white shadow-sm">
-          {/* Calendar Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">{monthName}</h2>
-            <div className="flex gap-2">
-              <Button variant="outline" size="icon" onClick={() => navigateMonth("prev")}>
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => navigateMonth("next")}>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </Card>
 
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-2">
-            {/* Day Headers */}
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <div key={day} className="text-center text-sm font-semibold text-gray-700 py-2">
-                {day}
-              </div>
-            ))}
-
-            {/* Empty cells for days before month starts */}
-            {Array.from({ length: startingDayOfWeek }).map((_, i) => (
-              <div key={`empty-${i}`} className="aspect-square" />
-            ))}
-
-            {/* Calendar Days */}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1
-              const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
-              const dayConsultations = getConsultationsForDate(date)
-              const isToday = date.toDateString() === new Date().toDateString()
-
-              return (
-                <div
-                  key={day}
-                  className={`aspect-square border rounded-lg p-2 ${
-                    isToday ? "border-amber-500 bg-amber-50" : "border-gray-200 bg-white"
-                  }`}
-                >
-                  <div className={`text-sm font-medium mb-1 ${isToday ? "text-amber-700" : "text-gray-900"}`}>
-                    {day}
+      <Dialog open={Boolean(selectedConsultation)} onOpenChange={(open) => { if (!open) closeDialog() }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Consultation details</DialogTitle>
+            <DialogDescription>
+              {selectedConsultation
+                ? `${selectedConsultation.firstName} ${selectedConsultation.lastName}`.trim()
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedConsultation ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="font-medium">{selectedConsultation.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Phone</p>
+                  <p className="font-medium">{selectedConsultation.phone}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Company</p>
+                  <p className="font-medium">{selectedConsultation.company}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Industry</p>
+                  <p className="font-medium">{selectedConsultation.industry}</p>
+                </div>
+                {selectedConsultation.industryOther ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Industry (Other)</p>
+                    <p className="font-medium">{selectedConsultation.industryOther}</p>
                   </div>
-                  <div className="space-y-1">
-                    {dayConsultations.map((consultation) => (
-                      <div
-                        key={consultation.id}
-                        className={`text-xs p-1 rounded truncate ${
-                          consultation.status === "New"
-                            ? "bg-blue-100 text-blue-700"
-                            : consultation.status === "Contacted"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-green-100 text-green-700"
-                        }`}
-                        title={`${consultation.name} - ${consultation.preferredTime}`}
-                      >
-                        {consultation.preferredTime} - {consultation.name}
-                      </div>
+                ) : null}
+                <div>
+                  <p className="text-xs text-muted-foreground">Company size</p>
+                  <p className="font-medium">{selectedConsultation.companySize}</p>
+                </div>
+                {selectedConsultation.revenue ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Revenue</p>
+                    <p className="font-medium">{selectedConsultation.revenue}</p>
+                  </div>
+                ) : null}
+                <div>
+                  <p className="text-xs text-muted-foreground">Consultation format</p>
+                  <p className="font-medium">{selectedConsultation.consultationFormat}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Timeline</p>
+                  <p className="font-medium">{selectedConsultation.timeline}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Automation experience</p>
+                  <p className="font-medium">{selectedConsultation.automationExperience}</p>
+                </div>
+                {selectedConsultation.timeConsumers ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Biggest time consumers</p>
+                    <p className="font-medium">{selectedConsultation.timeConsumers}</p>
+                  </div>
+                ) : null}
+                {selectedConsultation.hearAbout ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Heard about us from</p>
+                    <p className="font-medium">{selectedConsultation.hearAbout}</p>
+                  </div>
+                ) : null}
+                {selectedConsultation.referralName ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Referral name</p>
+                    <p className="font-medium">{selectedConsultation.referralName}</p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Primary bottleneck</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{selectedConsultation.bottleneck}</p>
+                </div>
+                {selectedConsultation.additionalInfo ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Additional information</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedConsultation.additionalInfo}</p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Top challenges</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedConsultation.challenges.map((challenge) => (
+                      <Badge key={challenge} variant="outline">
+                        {challenge}
+                      </Badge>
                     ))}
+                    {selectedConsultation.challengesOther ? (
+                      <Badge variant="outline">{selectedConsultation.challengesOther}</Badge>
+                    ) : null}
                   </div>
                 </div>
-              )
-            })}
-          </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Driving factors</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedConsultation.drivingFactors.map((factor) => (
+                      <Badge key={factor} variant="outline">
+                        {factor}
+                      </Badge>
+                    ))}
+                    {selectedConsultation.drivingFactorsOther ? (
+                      <Badge variant="outline">{selectedConsultation.drivingFactorsOther}</Badge>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
 
-          {/* Legend */}
-          <div className="flex gap-4 mt-6 pt-6 border-t border-gray-200">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-blue-100" />
-              <span className="text-sm text-gray-700">New</span>
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Best times</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedConsultation.bestTimes.map((time) => (
+                    <Badge key={time} variant="secondary">
+                      {time}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant={selectedConsultation.emailUpdates ? "default" : "outline"}>
+                    Email updates
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={selectedConsultation.weeklyInsights ? "default" : "outline"}>
+                    Weekly insights
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={selectedConsultation.eventNotifications ? "default" : "outline"}>
+                    Event notifications
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={closeDialog}>Close</Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-amber-100" />
-              <span className="text-sm text-gray-700">Contacted</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-green-100" />
-              <span className="text-sm text-gray-700">Done</span>
-            </div>
-          </div>
-        </Card>
-      )}
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

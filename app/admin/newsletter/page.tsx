@@ -1,153 +1,250 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Download } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Download, Filter, RefreshCcw, Search } from "lucide-react"
 
-// Mock data
-const mockSubscribers = [
-  {
-    id: 1,
-    email: "subscriber1@example.com",
-    dateJoined: "2025-01-10T08:30:00",
-    active: true,
-  },
-  {
-    id: 2,
-    email: "subscriber2@example.com",
-    dateJoined: "2025-01-12T14:20:00",
-    active: true,
-  },
-  {
-    id: 3,
-    email: "subscriber3@example.com",
-    dateJoined: "2025-01-14T10:15:00",
-    active: false,
-  },
-  {
-    id: 4,
-    email: "subscriber4@example.com",
-    dateJoined: "2025-01-15T16:45:00",
-    active: true,
-  },
-]
+type Subscription = {
+  id: string
+  email: string
+  type: "newsletter" | "community"
+  createdAt: string
+}
 
 export default function NewsletterPage() {
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [subscribers, setSubscribers] = useState(mockSubscribers)
+  const [selectedType, setSelectedType] = useState("all")
 
-  const filteredSubscribers = subscribers.filter((subscriber) =>
-    subscriber.email.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const loadSubscriptions = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/subscriptions", { signal })
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
+      const data = (await response.json()) as { subscriptions?: Subscription[] }
+      setSubscriptions(data.subscriptions ?? [])
+    } catch (fetchError) {
+      if ((fetchError as Error).name === "AbortError") {
+        return
+      }
+
+      console.error("Unable to load subscriptions", fetchError)
+      setError("We couldn't load the latest subscribers. Please try again later.")
+      setSubscriptions([])
+    } finally {
+      if (!signal?.aborted) {
+        setLoading(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    void loadSubscriptions(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
+  }, [loadSubscriptions])
+
+  const filteredSubscriptions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    return subscriptions.filter((subscription) => {
+      const matchesType = selectedType === "all" || subscription.type === selectedType
+
+      if (!matchesType) {
+        return false
+      }
+
+      if (!normalizedQuery) {
+        return true
+      }
+
+      return subscription.email.toLowerCase().includes(normalizedQuery)
+    })
+  }, [subscriptions, searchQuery, selectedType])
+
+  const newsletterCount = subscriptions.filter((subscription) => subscription.type === "newsletter").length
+  const communityCount = subscriptions.filter((subscription) => subscription.type === "community").length
+
+  const resultsSummary = loading
+    ? "Loading subscribers..."
+    : error
+      ? "Unable to display subscribers."
+      : `Showing ${filteredSubscriptions.length} of ${subscriptions.length} subscribers`
 
   const handleExportCSV = () => {
-    const headers = ["Email", "Date Joined", "Status"]
-    const csvData = filteredSubscribers.map((sub) => [
-      sub.email,
-      new Date(sub.dateJoined).toLocaleString(),
-      sub.active ? "Active" : "Unsubscribed",
+    if (filteredSubscriptions.length === 0) {
+      return
+    }
+
+    const headers = ["Email", "Type", "Joined"]
+
+    const csvData = filteredSubscriptions.map((subscription) => [
+      subscription.email,
+      subscription.type === "newsletter" ? "Newsletter" : "Community Waitlist",
+      new Date(subscription.createdAt).toLocaleString(),
     ])
 
-    const csvContent = [headers.join(","), ...csvData.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map((row) =>
+        row
+          .map((cell) => {
+            const normalized = cell.replace(/"/g, '""')
+            return `"${normalized}"`
+          })
+          .join(","),
+      ),
+    ].join("\n")
 
     const blob = new Blob([csvContent], { type: "text/csv" })
     const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `newsletter-subscribers-${new Date().toISOString().split("T")[0]}.csv`
-    a.click()
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `subscriptions-${new Date().toISOString().split("T")[0]}.csv`
+    anchor.click()
+    window.URL.revokeObjectURL(url)
   }
 
-  const handleToggleActive = (id: number) => {
-    setSubscribers((prev) => prev.map((sub) => (sub.id === id ? { ...sub, active: !sub.active } : sub)))
+  const handleRefresh = () => {
+    void loadSubscriptions()
+  }
+
+  const badgeForType = (type: Subscription["type"]) => {
+    if (type === "community") {
+      return "bg-purple-100 text-purple-700"
+    }
+
+    return "bg-emerald-100 text-emerald-700"
   }
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Newsletter Subscribers</h1>
-        <p className="text-gray-600 mt-1">View all email subscribers collected from your website</p>
+        <h1 className="text-3xl font-bold text-foreground">Subscribers</h1>
+        <p className="text-muted-foreground mt-1">
+          View newsletter subscribers and community waitlist signups captured across the site.
+        </p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 bg-white shadow-sm">
-          <div className="text-sm font-medium text-gray-600">Total Subscribers</div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">{subscribers.length}</div>
+        <Card className="p-6 border-border bg-card">
+          <div className="text-sm font-medium text-muted-foreground">Total Subscribers</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{subscriptions.length}</div>
         </Card>
-        <Card className="p-6 bg-white shadow-sm">
-          <div className="text-sm font-medium text-gray-600">Active Subscribers</div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">{subscribers.filter((s) => s.active).length}</div>
+        <Card className="p-6 border-border bg-card">
+          <div className="text-sm font-medium text-muted-foreground">Newsletter Subscribers</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{newsletterCount}</div>
         </Card>
-        <Card className="p-6 bg-white shadow-sm">
-          <div className="text-sm font-medium text-gray-600">Unsubscribed</div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">{subscribers.filter((s) => !s.active).length}</div>
+        <Card className="p-6 border-border bg-card">
+          <div className="text-sm font-medium text-muted-foreground">Community Waitlist</div>
+          <div className="text-3xl font-bold text-foreground mt-2">{communityCount}</div>
         </Card>
       </div>
 
-      {/* Filters and Actions */}
-      <Card className="p-4 bg-white shadow-sm">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
+      {error ? (
+        <Card className="p-4 border-destructive/40 bg-destructive/10 text-destructive">{error}</Card>
+      ) : null}
+
+      <Card className="p-4 border-border bg-card">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="flex-1 w-full">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Search by email..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-gray-50"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="pl-10"
               />
             </div>
           </div>
 
-          {/* Export Button */}
-          <Button onClick={handleExportCSV} className="bg-amber-500 hover:bg-amber-600">
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger className="w-full md:w-48">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="newsletter">Newsletter</SelectItem>
+              <SelectItem value="community">Community Waitlist</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleRefresh} disabled={loading} className="flex items-center gap-2">
+              <RefreshCcw className="w-4 h-4" />
+              Refresh
+            </Button>
+            <Button
+              onClick={handleExportCSV}
+              variant="outline"
+              disabled={filteredSubscriptions.length === 0 || loading}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </Button>
+          </div>
         </div>
       </Card>
 
-      {/* Results Count */}
-      <div className="text-sm text-gray-600">
-        Showing {filteredSubscribers.length} of {subscribers.length} subscribers
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span>{resultsSummary}</span>
+        {loading ? <Badge variant="secondary">Loading</Badge> : null}
       </div>
 
-      {/* Table */}
-      <Card className="bg-white shadow-sm">
+      <Card className="border-border bg-card">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="text-gray-700">Email</TableHead>
-              <TableHead className="text-gray-700">Date Joined</TableHead>
-              <TableHead className="text-gray-700">Status</TableHead>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-muted-foreground">Email</TableHead>
+              <TableHead className="text-muted-foreground">Type</TableHead>
+              <TableHead className="text-muted-foreground">Joined</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSubscribers.length === 0 ? (
+            {loading ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                  Loading subscribers...
+                </TableCell>
+              </TableRow>
+            ) : filteredSubscriptions.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                   No subscribers found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredSubscribers.map((subscriber) => (
-                <TableRow key={subscriber.id}>
-                  <TableCell className="font-medium text-gray-900">{subscriber.email}</TableCell>
-                  <TableCell className="text-sm text-gray-700">
-                    {new Date(subscriber.dateJoined).toLocaleDateString()}
-                  </TableCell>
+              filteredSubscriptions.map((subscription) => (
+                <TableRow key={subscription.id} className="border-border hover:bg-muted/5">
+                  <TableCell className="font-medium text-foreground">{subscription.email}</TableCell>
                   <TableCell>
-                    <Badge className={subscriber.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
-                      {subscriber.active ? "Active" : "Unsubscribed"}
+                    <Badge className={badgeForType(subscription.type)}>
+                      {subscription.type === "newsletter" ? "Newsletter" : "Community Waitlist"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {new Date(subscription.createdAt).toLocaleString()}
                   </TableCell>
                 </TableRow>
               ))
