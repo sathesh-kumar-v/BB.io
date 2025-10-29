@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail, sendNotificationEmail } from "@/lib/email"
-import { storeCommunityApplication, type CommunityApplicationPayload } from "@/lib/storage"
+import {
+  fetchCommunityApplications,
+  storeCommunityApplication,
+  type CommunityApplicationPayload,
+} from "@/lib/storage"
 
 const applicationSchema = z.object({
   firstName: z.string().min(1),
@@ -19,6 +23,17 @@ const applicationSchema = z.object({
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+export async function GET() {
+  try {
+    const applications = await fetchCommunityApplications()
+
+    return NextResponse.json({ applications })
+  } catch (error) {
+    console.error("Failed to load community applications", error)
+    return NextResponse.json({ error: "Unable to load community applications" }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

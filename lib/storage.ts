@@ -268,9 +268,26 @@ type ConsultationRow = {
   email: string
   phone: string
   company: string
+  industry: string
+  industry_other: string | null
+  company_size: string
+  revenue: string | null
   bottleneck: string
+  challenges: string[] | null
+  challenges_other: string | null
+  time_consumers: string | null
+  automation_experience: string
+  timeline: string
+  driving_factors: string[] | null
+  driving_factors_other: string | null
+  consultation_format: string
+  best_times: string[] | null
   additional_info: string | null
   hear_about: string | null
+  referral_name: string | null
+  email_updates: boolean
+  weekly_insights: boolean
+  event_notifications: boolean
   created_at: string
 }
 
@@ -553,9 +570,26 @@ function toConsultationRowFromStored(record: StoredConsultation): ConsultationRo
     email: record.email,
     phone: record.phone,
     company: record.company,
+    industry: record.industry,
+    industry_other: record.industryOther ?? null,
+    company_size: record.companySize,
+    revenue: record.revenue ?? null,
     bottleneck: record.bottleneck,
+    challenges: record.challenges,
+    challenges_other: record.challengesOther ?? null,
+    time_consumers: record.timeConsumers ?? null,
+    automation_experience: record.automationExperience,
+    timeline: record.timeline,
+    driving_factors: record.drivingFactors,
+    driving_factors_other: record.drivingFactorsOther ?? null,
+    consultation_format: record.consultationFormat,
+    best_times: record.bestTimes,
     additional_info: record.additionalInfo ?? null,
     hear_about: record.hearAbout ?? null,
+    referral_name: record.referralName ?? null,
+    email_updates: record.emailUpdates,
+    weekly_insights: record.weeklyInsights,
+    event_notifications: record.eventNotifications,
     created_at: record.createdAt,
   }
 }
@@ -927,6 +961,141 @@ export async function fetchFooterLeads(): Promise<StoredFooterLead[]> {
     companyName: row.company_name,
     industry: row.industry,
     preferredCallTime: row.preferred_call_time,
+    createdAt: toIsoTimestamp(row.created_at),
+  }))
+}
+
+export async function fetchConsultations(): Promise<StoredConsultation[]> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+
+  const result = await pool.query<ConsultationRow>(
+    `
+      SELECT
+        id,
+        first_name,
+        last_name,
+        email,
+        phone,
+        company,
+        industry,
+        industry_other,
+        company_size,
+        revenue,
+        bottleneck,
+        challenges,
+        challenges_other,
+        time_consumers,
+        automation_experience,
+        timeline,
+        driving_factors,
+        driving_factors_other,
+        consultation_format,
+        best_times,
+        additional_info,
+        hear_about,
+        referral_name,
+        email_updates,
+        weekly_insights,
+        event_notifications,
+        created_at
+      FROM consultations
+      ORDER BY created_at DESC
+    `,
+  )
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone,
+    company: row.company,
+    industry: row.industry,
+    industryOther: row.industry_other ?? undefined,
+    companySize: row.company_size,
+    revenue: row.revenue ?? undefined,
+    bottleneck: row.bottleneck,
+    challenges: Array.isArray(row.challenges) ? row.challenges : [],
+    challengesOther: row.challenges_other ?? undefined,
+    timeConsumers: row.time_consumers ?? undefined,
+    automationExperience: row.automation_experience,
+    timeline: row.timeline,
+    drivingFactors: Array.isArray(row.driving_factors) ? row.driving_factors : [],
+    drivingFactorsOther: row.driving_factors_other ?? undefined,
+    consultationFormat: row.consultation_format,
+    bestTimes: Array.isArray(row.best_times) ? row.best_times : [],
+    additionalInfo: row.additional_info ?? undefined,
+    hearAbout: row.hear_about ?? undefined,
+    referralName: row.referral_name ?? undefined,
+    emailUpdates: row.email_updates,
+    weeklyInsights: row.weekly_insights,
+    eventNotifications: row.event_notifications,
+    createdAt: toIsoTimestamp(row.created_at),
+  }))
+}
+
+export async function fetchCommunityApplications(): Promise<StoredCommunityApplication[]> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+
+  const result = await pool.query<CommunityApplicationRow>(
+    `
+      SELECT
+        id,
+        first_name,
+        last_name,
+        email,
+        company,
+        industry,
+        team_size,
+        challenge,
+        has_automation,
+        outcome,
+        referral,
+        linkedin,
+        created_at
+      FROM community_applications
+      ORDER BY created_at DESC
+    `,
+  )
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    company: row.company,
+    industry: row.industry,
+    teamSize: row.team_size,
+    challenge: row.challenge,
+    hasAutomation: row.has_automation,
+    outcome: row.outcome,
+    referral: row.referral ?? undefined,
+    linkedin: row.linkedin ?? undefined,
+    createdAt: toIsoTimestamp(row.created_at),
+  }))
+}
+
+export async function fetchSubscriptions(): Promise<StoredSubscription[]> {
+  await ensureLeadTables()
+
+  const pool = getPool()
+
+  const result = await pool.query<SubscriptionRow>(
+    `
+      SELECT id, email, subscription_type, created_at
+      FROM subscriptions
+      ORDER BY created_at DESC
+    `,
+  )
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    email: row.email,
+    type: (row.subscription_type === "community" ? "community" : "newsletter") as SubscriptionPayload["type"],
     createdAt: toIsoTimestamp(row.created_at),
   }))
 }

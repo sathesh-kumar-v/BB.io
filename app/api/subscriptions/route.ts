@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail, sendNotificationEmail } from "@/lib/email"
-import { storeSubscription, type SubscriptionPayload } from "@/lib/storage"
+import { fetchSubscriptions, storeSubscription, type SubscriptionPayload } from "@/lib/storage"
 
 const subscriptionSchema = z.discriminatedUnion("type", [
   z.object({
@@ -16,6 +16,17 @@ const subscriptionSchema = z.discriminatedUnion("type", [
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+export async function GET() {
+  try {
+    const subscriptions = await fetchSubscriptions()
+
+    return NextResponse.json({ subscriptions })
+  } catch (error) {
+    console.error("Failed to load subscriptions", error)
+    return NextResponse.json({ error: "Unable to load subscriptions" }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

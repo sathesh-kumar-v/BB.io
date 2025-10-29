@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendConfirmationEmail } from "@/lib/email"
-import { storeConsultation, type ConsultationPayload } from "@/lib/storage"
+import { fetchConsultations, storeConsultation, type ConsultationPayload } from "@/lib/storage"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+export async function GET() {
+  try {
+    const consultations = await fetchConsultations()
+
+    return NextResponse.json({ consultations })
+  } catch (error) {
+    console.error("Failed to load consultations", error)
+    return NextResponse.json({ error: "Unable to load consultations" }, { status: 500 })
+  }
+}
 
 const consultationSchema = z.object({
   firstName: z.string().min(1),
